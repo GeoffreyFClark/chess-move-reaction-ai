@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+python-chess
+pydantic
+python-dotenv1
+stockfish
+pytest

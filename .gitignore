@@ -1,0 +1,52 @@
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+
+# --- Python (backend/) ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.venv/
+venv/
+env/
+ENV/
+
+# FastAPI/uvicorn logs (optional)
+logs/
+*.log
+
+# --- Node/React (frontend/) ---
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Vite / cache
+.vite/
+.vscode/.vite/
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- IDE/project files (optional to ignore) ---
+.vscode/
+.idea/
+*.iml
+
+# --- Data dumps (if any) ---
+data/*.pgn
+data/*.csv
+data/*.sqlite
