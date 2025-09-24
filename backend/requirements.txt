@@ -1,7 +1,7 @@
-fastapi
-uvicorn[standard]
-python-chess
-pydantic
-python-dotenv1
-stockfish
-pytest
+fastapi==0.114.2
+uvicorn[standard]==0.30.6
+python-chess==1.999
+pydantic==2.9.2
+python-dotenv==1.0.1
+stockfish==3.28.0
+pytest==8.3.3
