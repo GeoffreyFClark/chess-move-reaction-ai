@@ -13,6 +13,18 @@ TEMPLATES = {
     ],
     "blunderish": [
         "This looks like a serious mistake — the tactic against you is strong."
+    ],
+    "neutral": [
+        "Reasonable — keeps the balance without forcing matters."
+    ],
+    "mate_for": [
+        "Checkmate! Beautiful finish — the game is over."
+    ],
+    "mate_against": [
+        "Careful — this line allows a forced mate against you."
+    ],
+    "stalemate": [
+        "Stalemate — the game ends in a draw."
     ]
 }
 
