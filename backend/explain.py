@@ -29,7 +29,35 @@ TEMPLATES = {
 }
 
 def pick_line(key: str) -> str:
-    pass
+    arr = TEMPLATES.get(key, TEMPLATES["neutral"])
+    return arr[0]
 
 def explain_move(fen: str, move_str: str) -> dict:
-    pass
+    board = chess.Board(fen)
+    # Normalize move
+    try:
+        try:
+            move = board.parse_san(move_str)
+            normalized_move = board.san(move)
+        except ValueError:
+            move = board.parse_uci(move_str)
+            normalized_move = board.san(move)
+    except ValueError as e:
+        raise ValueError(f"Invalid move: {move_str}") from e
+
+    feats = extract_features_before_after(fen, move)
+
+    reaction = f"{pick_line(key)}"
+
+    # Create after-FEN and attach engine evals (diff) if configured
+    board_after = chess.Board(fen)
+    board_after.push(move)
+    fen_after = board_after.fen()
+
+    details = feats
+
+    return {
+        "normalized_move": normalized_move,
+        "reaction": reaction,
+        "details": details,
+    }
