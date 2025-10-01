@@ -14,10 +14,22 @@ def parse_move(board: chess.Board, move_str: str) -> chess.Move:
         raise ValueError(f"Invalid move: '{move_str}'. Provide SAN (e.g., Nf3) or UCI (e.g., g1f3).") from e
 
 def material_score(board: chess.Board) -> int:
-    pass
+    # Simple material: P=1, N=3, B=3, R=5, Q=9
+    values = {chess.PAWN:1, chess.KNIGHT:3, chess.BISHOP:3, chess.ROOK:5, chess.QUEEN:9}
+    score = 0
+    for piece_type, val in values.items():
+        score += len(board.pieces(piece_type, chess.WHITE)) * val
+        score -= len(board.pieces(piece_type, chess.BLACK)) * val
+    return score
 
 def king_exposed_heuristic(board: chess.Board, side: bool) -> bool:
-    pass
+    # Very rough: count attacks on king’s neighborhood
+    king_sq = board.king(side)
+    if king_sq is None:
+        return False
+    neighbors = [sq for sq in chess.SQUARES if chess.square_distance(sq, king_sq) == 1]
+    attacks = sum(1 for sq in neighbors if board.is_attacked_by(not side, sq))
+    return attacks >= 2
 
 def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     board = chess.Board(fen)
