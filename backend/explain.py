@@ -1,4 +1,5 @@
 import chess
+from features import extract_features_before_after
 from settings import settings
 
 TEMPLATES = {
@@ -47,7 +48,50 @@ def explain_move(fen: str, move_str: str) -> dict:
 
     feats = extract_features_before_after(fen, move)
 
+    # End-of-game messaging has priority
+    if feats.get("is_checkmate_after"):
+        key = "mate_for"
+        reasons = ["The move delivers checkmate."]
+    elif feats.get("is_stalemate_after"):
+        key = "stalemate"
+        reasons = ["The side to move has no legal moves and is not in check."]
+    elif feats.get("is_insufficient_material_after"):
+        key = "stalemate"
+        reasons = ["Insufficient mating material leads to a draw."]
+    elif feats.get("is_seventyfive_moves_after") or feats.get("is_fivefold_repetition_after"):
+        key = "stalemate"
+        reasons = ["Draw by rule (75-move or fivefold repetition)."]
+    else:
+        # Rule-based classification
+        key = "neutral"
+        reasons = []
+        if feats["is_capture"] or feats["is_check_move"]:
+            if feats["material_delta"] > 0:
+                key = "great_tactic"
+            elif feats["material_delta"] < 0 or feats["moved_piece_hanging"]:
+                key = "blunderish"
+            else:
+                key = "solid_improvement"
+        else:
+            if feats["moved_piece_hanging"] or feats["king_exposed"]:
+                key = "warning_hanging"
+            elif feats["material_delta"] > 0:
+                key = "solid_improvement"
+            else:
+                key = "neutral"
+
+        if feats["is_capture"]:
+            reasons.append("It trades material in your favor." if feats["material_delta"] > 0 else "The capture may not be justified tactically.")
+        if feats["is_check_move"]:
+            reasons.append("Forcing check increases pressure on the opponent’s king.")
+        if feats["moved_piece_hanging"]:
+            reasons.append("The destination square fails static exchange evaluation (likely loses material).")
+        if feats["king_exposed"]:
+            reasons.append("It may loosen king safety.")
+
     reaction = f"{pick_line(key)}"
+    if reasons:
+        reaction += " " + " ".join(reasons)
 
     # Create after-FEN and attach engine evals (diff) if configured
     board_after = chess.Board(fen)
