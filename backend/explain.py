@@ -1,6 +1,7 @@
 import chess
 from features import extract_features_before_after
 from settings import settings
+from engine import analyze_with_stockfish_before_after, is_configured
 
 TEMPLATES = {
     "great_tactic": [
@@ -68,12 +69,12 @@ def explain_move(fen: str, move_str: str) -> dict:
         if feats["is_capture"] or feats["is_check_move"]:
             if feats["material_delta"] > 0:
                 key = "great_tactic"
-            elif feats["material_delta"] < 0 or feats["moved_piece_hanging"]:
+            elif feats["material_delta"] < 0:
                 key = "blunderish"
             else:
                 key = "solid_improvement"
         else:
-            if feats["moved_piece_hanging"] or feats["king_exposed"]:
+            if feats["king_exposed"]:
                 key = "warning_hanging"
             elif feats["material_delta"] > 0:
                 key = "solid_improvement"
@@ -84,8 +85,6 @@ def explain_move(fen: str, move_str: str) -> dict:
             reasons.append("It trades material in your favor." if feats["material_delta"] > 0 else "The capture may not be justified tactically.")
         if feats["is_check_move"]:
             reasons.append("Forcing check increases pressure on the opponent’s king.")
-        if feats["moved_piece_hanging"]:
-            reasons.append("The destination square fails static exchange evaluation (likely loses material).")
         if feats["king_exposed"]:
             reasons.append("It may loosen king safety.")
 
@@ -99,6 +98,21 @@ def explain_move(fen: str, move_str: str) -> dict:
     fen_after = board_after.fen()
 
     details = feats
+    if is_configured():
+        engine = analyze_with_stockfish_before_after(fen, fen_after, depth=None)
+        details["engine"] = engine
+        # Optional: fold eval swing into the text if both cp scores are present
+        try:
+            b = engine["before"]
+            a = engine["after"]
+            if b.get("ok") and a.get("ok") and b.get("score_cp") is not None and a.get("score_cp") is not None:
+                swing = a["score_cp"] - b["score_cp"]
+                sign = "+" if swing >= 0 else ""
+                reaction += f" (Eval: {b['score_cp']/100:.2f} → {a['score_cp']/100:.2f}, Δ {sign}{swing/100:.2f})."
+        except Exception:
+            pass
+    else:
+        details["engine"] = {"enabled": False, "note": "Set STOCKFISH_PATH to enable engine evals."}
 
     return {
         "normalized_move": normalized_move,
