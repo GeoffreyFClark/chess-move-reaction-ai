@@ -105,10 +105,10 @@ def explain_move(fen: str, move_str: str) -> dict:
         try:
             b = engine["before"]
             a = engine["after"]
-            if b.get("ok") and a.get("ok") and b.get("score_cp") is not None and a.get("score_cp") is not None:
-                swing = a["score_cp"] - b["score_cp"]
+            if b.get("ok") and a.get("ok") and b.get("score_centipawn") is not None and a.get("score_centipawn") is not None:
+                swing = a["score_centipawn"] - b["score_centipawn"]
                 sign = "+" if swing >= 0 else ""
-                reaction += f" (Eval: {b['score_cp']/100:.2f} → {a['score_cp']/100:.2f}, Δ {sign}{swing/100:.2f})."
+                reaction += f" (Eval: {b['score_centipawn']/100:.2f} → {a['score_centipawn']/100:.2f}, Δ {sign}{swing/100:.2f})."
         except Exception:
             pass
     else:

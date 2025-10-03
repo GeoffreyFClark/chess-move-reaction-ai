@@ -17,8 +17,8 @@ def main():
             before = v.get("before", {})
             after = v.get("after", {})
             print(f"    - depth: {v.get('depth')}")
-            print(f"    - before: cp={before.get('score_cp')} mate={before.get('mate_in')} best={before.get('bestmove')}")
-            print(f"    - after:  cp={after.get('score_cp')} mate={after.get('mate_in')} best={after.get('bestmove')}")
+            print(f"    - before: centipawn={before.get('score_centipawn')} mate={before.get('mate_in')} best={before.get('bestmove')}")
+            print(f"    - after:  centipawn={after.get('score_centipawn')} mate={after.get('mate_in')} best={after.get('bestmove')}")
         else:
             print(f"  - {k}: {v}")
 
