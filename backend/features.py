@@ -54,9 +54,14 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["gives_check_after"] = board.is_check()
     features["material_after"] = material_score(board)
     features["material_delta"] = features["material_after"] - features["material_before"]
-
-    # SEE feature removed for now
-
+    
+    board_before = chess.Board(fen)
+    try:
+        see_value = board_before.see(move) # SEE = Static Exchange Evaluation, measured in centipawns
+    except Exception:
+        see_value = 0
+    features["see_value"] = see_value
+    
     # King safety proxy: did king move into danger (very rough)
     features["king_exposed"] = king_exposed_heuristic(board, side=(board.turn ^ 1))
 

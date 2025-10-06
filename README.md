@@ -24,3 +24,23 @@ pip install -r requirements.txt
 ```bash
 uvicorn app:app --reload --port 8000
 ```
+
+## CLI usage (no server required)
+```bash
+# i.e. Starting position and move 1. e4
+python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" --move "e4"
+```
+
+## Run frontend (new terminal)
+```bash
+cd /frontend
+npm install
+npm run dev
+```
+
+## Notes
+- v1 uses first order logic and propositional logic based on features extracted via `python-chess`
+- Stockfish is **optional**... When configured, engine before/after evals are attached to the response.
+- API: `POST /api/analyze` with `{ "fen": "...", "move": "Nf3|g1f3" }` returns `{ ok, normalized_move, reaction, details }`.
+- Can be used via CLI or via `react-chessboard` + `chess.js` frontend for drag-and-drop moves.
+- All centipawn calculations are from the White pieces' POV, which can yield mistaken reactions when testing from the Black pieces' POV.
