@@ -55,13 +55,6 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["material_after"] = material_score(board)
     features["material_delta"] = features["material_after"] - features["material_before"]
     
-    board_before = chess.Board(fen)
-    try:
-        see_value = board_before.see(move) # SEE = Static Exchange Evaluation, measured in centipawns
-    except Exception:
-        see_value = 0
-    features["see_value"] = see_value
-    
     # King safety proxy: did king move into danger (very rough)
     features["king_exposed"] = king_exposed_heuristic(board, side=(board.turn ^ 1))
 
@@ -80,3 +73,18 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
 # Center control.
 # Extend the king safety heuristic by including whether the king's escape squares shrink.
 # Roughly check for doubled, isolated, and passed pawns.
+
+# ------------ Comments from review ------------ #
+
+# Thanks, your plans regarding feature extraction sound good to add! Other quick ideas: 
+# - measure pinned piece count - board.is_pinned() 
+# - Castling-rights lost flags - board.has_castling_rights() 
+# - King-ring pressure (attackers on the 8 surrounding squares i.e. defending pawns) - board.attackers()
+# - Check flags (is the side to move in check or giving check after a move)
+# - Identifying when pieces are placed on undefended squares
+# - Piece development i.e. 4v2 developed out of the opening)
+# - legal_moves / generate_legal_moves() could be useful in many ways... including iteration through future board states for deeper feature extraction.
+
+# InvalidMoveError, IllegalMoveError, AmbiguousMoveError in python-chess all subclass ValueError, so one except ValueError already catches them. I kept it simple, but if we ever want to distinguish the types, we can just add type(e).__name__ to the message. Honestly, more useful might be richer debug/error messages and additional tests to support both extraction logic and the reaction/explanation logic.
+
+# Aside from expanding feature extraction, our main focus should be on utilizing those features in patterns/heuristics/algorithms from our course so the “AI reactions” feel more meaningful. Let's talk more on Discord with the rest of the team to delegate tasks more clearly.

@@ -34,7 +34,7 @@ pytest -q
 - app.py           - FastAPI app and /api/analyze endpoint
 - cli.py           - CLI wrapper to analyze a single FEN+move locally
 - explain.py       - Rule-based “reaction” engine + endgame messaging + (optional) engine deltas
-- features.py      - Feature extraction: material, tactical flags, SEE-based hanging check, endgame flags
+- features.py      - Feature extraction: material, tactical flags, endgame flags
 - engine.py        - Stockfish UCI runner (before/after evals) + configuration checks
 - schemas.py       - Pydantic request/response models for API
 - settings.py      - Config via env vars (CORS, STOCKFISH_PATH, depth, host/port)

@@ -44,3 +44,4 @@ npm run dev
 - API: `POST /api/analyze` with `{ "fen": "...", "move": "Nf3|g1f3" }` returns `{ ok, normalized_move, reaction, details }`.
 - Can be used via CLI or via `react-chessboard` + `chess.js` frontend for drag-and-drop moves.
 - All centipawn calculations are from the White pieces' POV, which can yield mistaken reactions when testing from the Black pieces' POV.
+- We accept both SAN (i.e. Nf3 -- human preferred) and UCI (fixed coordinate form i.e. g1f3 -- used by python-chess, engines, etc), store/log moves internally as UCI for consistency, and display explanations in SAN for readability.
