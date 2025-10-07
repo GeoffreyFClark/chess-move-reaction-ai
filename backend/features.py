@@ -88,3 +88,13 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
 # InvalidMoveError, IllegalMoveError, AmbiguousMoveError in python-chess all subclass ValueError, so one except ValueError already catches them. I kept it simple, but if we ever want to distinguish the types, we can just add type(e).__name__ to the message. Honestly, more useful might be richer debug/error messages and additional tests to support both extraction logic and the reaction/explanation logic.
 
 # Aside from expanding feature extraction, our main focus should be on utilizing those features in patterns/heuristics/algorithms from our course so the “AI reactions” feel more meaningful. Let's talk more on Discord with the rest of the team to delegate tasks more clearly.
+
+def get_num_legal_moves_scores(board: chess.Board) -> tuple[int, int]:
+    white_score, black_score = 0, 0
+    for move in board.legal_moves:
+        color = board.color_at(move.from_square)
+        if color is chess.WHITE:
+            white_score += 1
+        elif color is chess.Black:
+            black_score += 1
+    return white_score, black_score
