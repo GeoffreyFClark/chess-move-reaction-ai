@@ -89,12 +89,24 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
 
 # Aside from expanding feature extraction, our main focus should be on utilizing those features in patterns/heuristics/algorithms from our course so the “AI reactions” feel more meaningful. Let's talk more on Discord with the rest of the team to delegate tasks more clearly.
 
-def get_num_legal_moves_scores(board: chess.Board) -> tuple[int, int]:
+def get_mobility_scores(board: chess.Board) -> tuple[int, int]:
     white_score, black_score = 0, 0
     for move in board.legal_moves:
         color = board.color_at(move.from_square)
         if color is chess.WHITE:
             white_score += 1
-        elif color is chess.Black:
+        elif color is chess.BLACK:
             black_score += 1
+    return white_score, black_score
+
+def get_center_control_scores(board: chess.Board) -> tuple[int, int]:
+    center_squares = {'d4', 'e4', 'd5', 'e5'}
+    white_score, black_score = 0, 0
+    for move in board.legal_moves:
+        color = board.color_at(move.from_square)
+        if chess.square_name(move.to_square) in center_squares:
+            if color == chess.WHITE:
+                white_score += 1
+            elif color is chess.BLACK:
+                black_score += 1
     return white_score, black_score
