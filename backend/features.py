@@ -1,7 +1,7 @@
 import chess
 
 def parse_move(board: chess.Board, move_str: str) -> chess.Move:
-    # Try SAN first, then UCI
+    # Try Standard Algebraic Notation(SAN) first, then Universal Chess Interface(UCI)
     try:
         move = board.parse_san(move_str)
         return move
@@ -73,3 +73,10 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["is_fivefold_repetition_after"] = board.is_fivefold_repetition()
 
     return features
+
+
+# For parse_moves, are we leaving the exceptions as the general type "ValueError" ? Or would it be better to specify specific errors like InvalidMoveError, IllegalMoveError, and AmbiguousMoveError ?
+# I plan on implementing mobility feature which evaluates how many legal moves each side has.
+# Center control.
+# Extend the king safety heuristic by including whether the king's escape squares shrink.
+# Roughly check for doubled, isolated, and passed pawns.
