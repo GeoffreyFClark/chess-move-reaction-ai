@@ -1,7 +1,9 @@
 import chess
 
 def parse_move(board: chess.Board, move_str: str) -> chess.Move:
-    # Try Standard Algebraic Notation(SAN) first, then Universal Chess Interface(UCI)
+    """ Handle both Standard Algebraic Notation(SAN) first, then Universal Chess Interface(UCI).
+    SAN for human convenience (CLI and tests), UCI for compatibility with engines and APIs.
+    """
     try:
         move = board.parse_san(move_str)
         return move
@@ -14,7 +16,7 @@ def parse_move(board: chess.Board, move_str: str) -> chess.Move:
         raise ValueError(f"Invalid move: '{move_str}'. Provide SAN (e.g., Nf3) or UCI (e.g., g1f3).") from e
 
 def material_score(board: chess.Board) -> int:
-    # Simple material: P=1, N=3, B=3, R=5, Q=9
+    """Compute material score from White's perspective. Positive = White ahead, Negative = Black ahead."""
     values = {chess.PAWN:1, chess.KNIGHT:3, chess.BISHOP:3, chess.ROOK:5, chess.QUEEN:9}
     score = 0
     for piece_type, val in values.items():
@@ -23,13 +25,13 @@ def material_score(board: chess.Board) -> int:
     return score
 
 def king_exposed_heuristic(board: chess.Board, side: bool) -> bool:
-    # Very rough: count attacks on king’s neighborhood
+    """Very rough: count squares attacked around the king. If 4 or more attacks, consider king exposed."""
     king_sq = board.king(side)
     if king_sq is None:
         return False
     neighbors = [sq for sq in chess.SQUARES if chess.square_distance(sq, king_sq) == 1]
     attacks = sum(1 for sq in neighbors if board.is_attacked_by(not side, sq))
-    return attacks >= 2
+    return attacks >= 4
 
 def count_pins(board: chess.Board) -> dict:
     """Count 'squares pinned to king' for each side using python-chess board.is_pinned().
@@ -63,19 +65,51 @@ def castling_rights_lost(before: dict, after: dict) -> dict:
     return lost
 
 def extract_features_before_after(fen: str, move: chess.Move) -> dict:
+    """Extract features from a FEN position before and after a given move.
+
+    Returns a dict of features including:
+    - turn: "White" or "Black"
+    - in_check: bool before move
+    - legal: bool if move is legal
+
+        Before-move info:
+    - material_before: int material score before move
+    - is_capture: bool if move captures
+    - is_check_move: bool if move gives check
+    - is_promotion: bool if move promotes
+    - pins_before: dict {"white": n, "black": n} Number of 'squares pinned to king' before move
+    - castling_rights_before: dict of castling rights before move
+    
+        After-move info:
+    - in_check_after: bool after move
+    - gives_check_after: bool if move gives check
+    - material_after: int material score after move
+    - material_delta: int material_after - material_before
+    - pins_after: dict {"white": n, "black": n} Number of 'squares pinned to king' after move
+    - castling_rights_after: dict of castling rights after move
+    - castling_rights_lost: dict of which castling rights were lost due to the move
+    - king_exposed: bool if king is exposed after move - could use refinement, ie before+after
+    
+        Game termination flags:
+    - is_checkmate_after: bool if move results in checkmate
+    - is_stalemate_after: bool if move results in stalemate
+    - is_insufficient_material_after: bool if move results in insufficient material draw
+    """
+
     board = chess.Board(fen)
     features = {
         "turn": "White" if board.turn == chess.WHITE else "Black",
         "in_check": board.is_check(),
         "legal": move in board.legal_moves,
     }
-    # Material before
-    features["material_before"] = material_score(board)
 
-    # Tactics: is capture? is check? is promotion?
+    # Before-move info
+    features["material_before"] = material_score(board)
     features["is_capture"] = board.is_capture(move)
     features["is_check_move"] = board.gives_check(move)
     features["is_promotion"] = (move.promotion is not None)
+    features["pins_before"] = count_pins(board)
+    features["castling_rights_before"] = get_castling_rights(board)
 
     # Execute the move
     board.push(move)
@@ -85,8 +119,10 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["gives_check_after"] = board.is_check()
     features["material_after"] = material_score(board)
     features["material_delta"] = features["material_after"] - features["material_before"]
-    
-    # King safety proxy: did king move into danger (very rough)
+    features["pins_after"] = count_pins(board)
+    features["castling_rights_after"] = get_castling_rights(board)
+    features["castling_rights_lost"] = {color: rights - features["castling_rights_after"].get(color, 0)
+                                         for color, rights in features["castling_rights_before"].items()}
     features["king_exposed"] = king_exposed_heuristic(board, side=(board.turn ^ 1))
 
     # Game termination flags
@@ -119,6 +155,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
 # Aside from expanding feature extraction, our main focus should be on utilizing those features in patterns/heuristics/algorithms from our course so the “AI reactions” feel more meaningful. Let's talk more on Discord with the rest of the team to delegate tasks more clearly.
 
 def get_mobility_scores(board: chess.Board) -> tuple[int, int]:
+    """Evaluates each side's mobility based on the number of available moves per side."""
     white_score, black_score = 0, 0
     for move in board.legal_moves:
         color = board.color_at(move.from_square)
@@ -129,6 +166,7 @@ def get_mobility_scores(board: chess.Board) -> tuple[int, int]:
     return white_score, black_score
 
 def get_center_control_scores(board: chess.Board) -> tuple[int, int]:
+    """Evaluates each side's center control based on the number of moves that are attacking the center squares: d4, e4, d5, e5."""
     center_squares = {'d4', 'e4', 'd5', 'e5'}
     white_score, black_score = 0, 0
     for move in board.legal_moves:

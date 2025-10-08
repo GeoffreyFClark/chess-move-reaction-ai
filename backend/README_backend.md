@@ -40,12 +40,3 @@ pytest -q
 - settings.py      - Config via env vars (CORS, STOCKFISH_PATH, depth, host/port)
 - tests/
   test_explain.py  - Basic tests for parsing and explanations
-
-## features.py
-
-### get_mobility_scores(...)
-- evaluates each side's mobility based on the number of available moves per side.
-
-### get_center_control_scores(...)
-- evaluates each side's center control based on the number of moves that are attacking the 
-center squares: d4, e4, d5, e5.

@@ -31,12 +31,20 @@ TEMPLATES = {
 }
 
 def pick_line(key: str) -> str:
+    """Pick a template line for the given key."""
     arr = TEMPLATES.get(key, TEMPLATES["neutral"])
     return arr[0]
 
 def explain_move(fen: str, move_str: str) -> dict:
+    """Given a FEN and a move (in SAN or UCI), return an explanation dict with:
+    - normalized_move: move in standard SAN notation
+    - reaction: text reaction to the move
+    - details: dict of extracted features and (if configured) engine evals before/after
+    """
+
     board = chess.Board(fen)
-    # Normalize move
+
+    # Normalize move to SAN
     try:
         try:
             move = board.parse_san(move_str)
