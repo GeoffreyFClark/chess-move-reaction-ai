@@ -107,8 +107,12 @@ export default function App() {
   if (engine?.enabled && engine.before?.ok && engine.after?.ok) {
     const b = engine.before;
     const a = engine.after;
-    const bStr = b.score_cp !== null && b.score_cp !== undefined ? (b.score_cp/100).toFixed(2) : (b.mate_in ? `#${b.mate_in}` : "n/a");
-    const aStr = a.score_cp !== null && a.score_cp !== undefined ? (a.score_cp/100).toFixed(2) : (a.mate_in ? `#${a.mate_in}` : "n/a");
+    const bStr = (b.score_centipawn !== null && b.score_centipawn !== undefined)
+      ? (b.score_centipawn/100).toFixed(2)
+      : (b.mate_in ? `#${b.mate_in}` : "n/a");
+    const aStr = (a.score_centipawn !== null && a.score_centipawn !== undefined)
+      ? (a.score_centipawn/100).toFixed(2)
+      : (a.mate_in ? `#${a.mate_in}` : "n/a");
     evalBox = (
       <p><strong>Engine (d{engine.depth}):</strong> {bStr} → {aStr}, best {a.bestmove || "?"}</p>
     );

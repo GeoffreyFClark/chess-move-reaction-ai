@@ -49,6 +49,10 @@ def explain_move(fen: str, move_str: str) -> dict:
 
     feats = extract_features_before_after(fen, move)
 
+    # Track who is moving and material delta from their perspective
+    mover = feats["turn"] 
+    material_delta_from_mover = feats["material_delta"] if mover == "White" else -feats["material_delta"]
+
     # End-of-game messaging has priority
     if feats.get("is_checkmate_after"):
         key = "mate_for"
@@ -59,30 +63,27 @@ def explain_move(fen: str, move_str: str) -> dict:
     elif feats.get("is_insufficient_material_after"):
         key = "stalemate"
         reasons = ["Insufficient mating material leads to a draw."]
-    elif feats.get("is_seventyfive_moves_after") or feats.get("is_fivefold_repetition_after"):
-        key = "stalemate"
-        reasons = ["Draw by rule (75-move or fivefold repetition)."]
     else:
         # Rule-based classification
         key = "neutral"
         reasons = []
         if feats["is_capture"] or feats["is_check_move"]:
-            if feats["material_delta"] > 0:
+            if material_delta_from_mover > 0:
                 key = "great_tactic"
-            elif feats["material_delta"] < 0:
+            elif material_delta_from_mover < 0:
                 key = "blunderish"
             else:
                 key = "solid_improvement"
         else:
             if feats["king_exposed"]:
                 key = "warning_hanging"
-            elif feats["material_delta"] > 0:
+            elif material_delta_from_mover > 0:
                 key = "solid_improvement"
             else:
                 key = "neutral"
 
         if feats["is_capture"]:
-            reasons.append("It trades material in your favor." if feats["material_delta"] > 0 else "The capture may not be justified tactically.")
+            reasons.append("It trades material in your favor." if material_delta_from_mover > 0 else "The capture may not be justified tactically.")
         if feats["is_check_move"]:
             reasons.append("Forcing check increases pressure on the opponent’s king.")
         if feats["king_exposed"]:

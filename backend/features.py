@@ -31,6 +31,37 @@ def king_exposed_heuristic(board: chess.Board, side: bool) -> bool:
     attacks = sum(1 for sq in neighbors if board.is_attacked_by(not side, sq))
     return attacks >= 2
 
+def count_pins(board: chess.Board) -> dict:
+    """Count 'squares pinned to king' for each side using python-chess board.is_pinned().
+    Returns a dict like {"white": n, "black": n}. 
+    """
+    counts = {"white": 0, "black": 0}
+    for sq, piece in board.piece_map().items():
+        if board.is_pinned(piece.color, sq):
+            if piece.color == chess.WHITE:
+                counts["white"] += 1
+            else:
+                counts["black"] += 1
+    return counts
+
+def get_castling_rights(board: chess.Board) -> dict:
+    """Return current castling rights flags for each side (kingside/queenside) as a dict."""
+    return {
+        "white_can_castle_k": board.has_kingside_castling_rights(chess.WHITE),
+        "white_can_castle_q": board.has_queenside_castling_rights(chess.WHITE),
+        "black_can_castle_k": board.has_kingside_castling_rights(chess.BLACK),
+        "black_can_castle_q": board.has_queenside_castling_rights(chess.BLACK),
+    }
+
+def castling_rights_lost(before: dict, after: dict) -> dict:
+    """Compute which castling rights were lost. Returns a dict with *_lost boolean flags.
+    Given two castling rights dicts BEFORE + AFTER (each generated from get_castling_rights()).
+    Returns a dict with {key}_lost boolean flags."""
+    lost = {}
+    for k, v in before.items():
+        lost[f"{k}_lost"] = bool(v and not after.get(k))
+    return lost
+
 def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     board = chess.Board(fen)
     features = {
@@ -62,8 +93,6 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["is_checkmate_after"] = board.is_checkmate()
     features["is_stalemate_after"] = board.is_stalemate()
     features["is_insufficient_material_after"] = board.is_insufficient_material()
-    features["is_seventyfive_moves_after"] = board.is_seventyfive_moves()
-    features["is_fivefold_repetition_after"] = board.is_fivefold_repetition()
 
     return features
 
