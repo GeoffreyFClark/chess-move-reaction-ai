@@ -64,6 +64,23 @@ def castling_rights_lost(before: dict, after: dict) -> dict:
         lost[f"{k}_lost"] = bool(v and not after.get(k))
     return lost
 
+def ud_material(board):
+    """Count the number of underdefended pieces for each side using python-chess board.attackers().
+    Returns a dict like {"white": n, "black": n}. 
+    """
+    # TODO: Add consideration of material value (attackers vs. defenders) + identification of which pieces are underdefended.
+    counts = {"white": 0, "black": 0}
+    for sq, piece in board.piece_map().items():
+        attackers = board.attackers(not piece.color, sq)
+        defenders = board.attackers(piece.color, sq)
+        if (len(attackers) - len(defenders) > 0):
+            if piece.color == chess.WHITE:
+                counts["white"] += 1
+            else:
+                counts["black"] += 1
+    return counts
+
+
 def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     """Extract features from a FEN position before and after a given move.
 
@@ -79,6 +96,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     - is_promotion: bool if move promotes
     - pins_before: dict {"white": n, "black": n} Number of 'squares pinned to king' before move
     - castling_rights_before: dict of castling rights before move
+    - ud_material_before: dict {"white": n, "black": n} Number of underdefended pieces before move
     
         After-move info:
     - in_check_after: bool after move
@@ -89,6 +107,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     - castling_rights_after: dict of castling rights after move
     - castling_rights_lost: dict of which castling rights were lost due to the move
     - king_exposed: bool if king is exposed after move - could use refinement, ie before+after
+    - ud_material_after: dict {"white": n, "black": n} Number of underdefended pieces after move
     
         Game termination flags:
     - is_checkmate_after: bool if move results in checkmate
@@ -110,6 +129,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["is_promotion"] = (move.promotion is not None)
     features["pins_before"] = count_pins(board)
     features["castling_rights_before"] = get_castling_rights(board)
+    features["ud_material_before"] = ud_material(board)
 
     # Execute the move
     board.push(move)
@@ -124,6 +144,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["castling_rights_lost"] = {color: rights - features["castling_rights_after"].get(color, 0)
                                          for color, rights in features["castling_rights_before"].items()}
     features["king_exposed"] = king_exposed_heuristic(board, side=(board.turn ^ 1))
+    features["ud_material_after"] = ud_material(board)
 
     # Game termination flags
     features["is_checkmate_after"] = board.is_checkmate()
