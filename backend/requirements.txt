@@ -1,6 +1,6 @@
 fastapi==0.114.2
 uvicorn[standard]==0.30.6
-python-chess==1.11.2
+python-chess==1.999
 pydantic==2.9.2
 python-dotenv==1.0.1
 stockfish==3.28.0

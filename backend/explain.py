@@ -60,6 +60,11 @@ def explain_move(fen: str, move_str: str) -> dict:
     # Track who is moving and material delta from their perspective
     mover = feats["turn"] 
     material_delta_from_mover = feats["material_delta"] if mover == "White" else -feats["material_delta"]
+    
+    if mover == "White": # TODO: Add consideration of ud_delta for nonmover as well.
+        ud_material_delta_from_mover = feats["ud_material_after"]["white"] - feats["ud_material_before"]["white"]
+    else:
+        ud_material_delta_from_mover = feats["ud_material_after"]["black"] - feats["ud_material_before"]["black"]
 
     # End-of-game messaging has priority
     if feats.get("is_checkmate_after"):
@@ -96,6 +101,13 @@ def explain_move(fen: str, move_str: str) -> dict:
             reasons.append("Forcing check increases pressure on the opponent’s king.")
         if feats["king_exposed"]:
             reasons.append("It may loosen king safety.")
+
+        if ud_material_delta_from_mover > 0:
+            reasons.append("Careful - You have underdefended a piece.")
+        elif ud_material_delta_from_mover < 0:
+            reasons.append("You have sufficiently defended an underdefended piece/evaded an attacker.")
+        else:
+            reasons.append("Underdefended pieces remain unchanged.")
 
     reaction = f"{pick_line(key)}"
     if reasons:
