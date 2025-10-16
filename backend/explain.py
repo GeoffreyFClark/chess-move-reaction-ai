@@ -61,10 +61,24 @@ def explain_move(fen: str, move_str: str) -> dict:
     mover = feats["turn"] 
     material_delta_from_mover = feats["material_delta"] if mover == "White" else -feats["material_delta"]
     
-    if mover == "White": # TODO: Add consideration of ud_delta for nonmover as well.
-        ud_material_delta_from_mover = feats["ud_material_after"]["white"] - feats["ud_material_before"]["white"]
+    # Track underdefended material from both sides.
+    # TODO: More linguistic variation (you defended this/your opponent's piece is hanging/etc.)
+    if mover == "White":
+        ud_material_from_mover_before = feats["ud_material_before"]["white"]
+        ud_material_from_mover = feats["ud_material_after"]["white"]
+        ud_material_from_nonmover = feats["ud_material_after"]["black"]
     else:
-        ud_material_delta_from_mover = feats["ud_material_after"]["black"] - feats["ud_material_before"]["black"]
+        ud_material_from_mover_before = feats["ud_material_before"]["black"]
+        ud_material_from_mover = feats["ud_material_after"]["black"]
+        ud_material_from_nonmover = feats["ud_material_after"]["white"]
+
+    # Identifies changes in underdefended material (mover only, for now).
+    ud_material_from_mover_no_longer = []
+    for piece in ud_material_from_mover_before:
+            if piece[0] == chess.square_name(move.from_square): # Special case: Convert moved piece to same form as "after" board.
+                piece = (chess.square_name(move.to_square), piece[1])
+            if piece not in ud_material_from_mover:
+                ud_material_from_mover_no_longer.append(piece)
 
     # End-of-game messaging has priority
     if feats.get("is_checkmate_after"):
@@ -102,12 +116,12 @@ def explain_move(fen: str, move_str: str) -> dict:
         if feats["king_exposed"]:
             reasons.append("It may loosen king safety.")
 
-        if ud_material_delta_from_mover > 0:
-            reasons.append("Careful - You have underdefended a piece.")
-        elif ud_material_delta_from_mover < 0:
-            reasons.append("You have sufficiently defended an underdefended piece/evaded an attacker.")
-        else:
-            reasons.append("Underdefended pieces remain unchanged.")
+        for piece in ud_material_from_mover_no_longer:
+            reasons.append(f"Your {piece[1]} at {piece[0]} is no longer underdefended!")
+        for piece in ud_material_from_mover:
+            reasons.append(f"You have an underdefended {piece[1]} at {piece[0]}!")
+        for piece in ud_material_from_nonmover:
+            reasons.append(f"Your opponent has an underdefended {piece[1]} at {piece[0]}!")
 
     reaction = f"{pick_line(key)}"
     if reasons:

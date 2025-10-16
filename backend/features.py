@@ -65,20 +65,70 @@ def castling_rights_lost(before: dict, after: dict) -> dict:
     return lost
 
 def ud_material(board):
-    """Count the number of underdefended pieces for each side using python-chess board.attackers().
-    Returns a dict like {"white": n, "black": n}. 
+    """Return the underdefended pieces for each side using python-chess board.attackers().
+    Returns a dict like {"white": [(sq, piece), ...], "black": [(sq, piece), ...]}.
     """
-    # TODO: Add consideration of material value (attackers vs. defenders) + identification of which pieces are underdefended.
-    counts = {"white": 0, "black": 0}
+    # BUG: Assumes order of exchange is from least to most valuable pieces, which ignores cases where
+    # certain pieces MUST be exchanged before others (eg. rook behind a queen).
+    # BUG: board.attackers can't detect attackers that are behind other attackers
+    # (eg. bishop behind pawn taking diagonally)
+    # BUG: Ignores pinned pieces which cannot be moved, as well as partial pins.
+    # BUG: Ignoring overwhelming complexity from considering board after each exchange possibility.
+    underdefended_pieces = {"white": [], "black": []}
+    values = {chess.PAWN:1, chess.KNIGHT:3, chess.BISHOP:3, chess.ROOK:5, chess.QUEEN:9, chess.KING:999}
     for sq, piece in board.piece_map().items():
-        attackers = board.attackers(not piece.color, sq)
-        defenders = board.attackers(piece.color, sq)
-        if (len(attackers) - len(defenders) > 0):
-            if piece.color == chess.WHITE:
-                counts["white"] += 1
-            else:
-                counts["black"] += 1
-    return counts
+        # Do not consider kings as underdefended (since it doesn't make sense to exchange the king).
+        if not piece.piece_type == chess.KING:
+            attackers = board.attackers(not piece.color, sq)
+            defenders = board.attackers(piece.color, sq)
+
+            if attackers: # TODO: Consider differentiating loose, hanging, and loosely defended pieces.
+                if piece.color == chess.WHITE:
+                    color = "white"
+                else:
+                    color = "black"
+                a_material = []
+                d_material = []
+
+                # Prepare information to simulate exchange possibilities.
+                for a_sq in attackers:
+                    a_piece = board.piece_at(a_sq).piece_type
+                    a_material.append(values[a_piece])
+
+                for d_sq in defenders:
+                    d_piece = board.piece_at(d_sq).piece_type
+                    d_material.append(values[d_piece])
+
+                # Assuming players will exchange from least to most valuable pieces.
+                a_material.sort()
+                d_material.sort()
+                d_material = [values[piece.piece_type]] + d_material # Prepend current piece since it will be taken first.
+
+                # Simulate an exchange to determine if an unfavorable exchange could be forced.
+                score = 0
+                attackers_turn = True
+                full_exchange = True
+                while not ((attackers_turn and not a_material) or (not attackers_turn and not d_material)):
+                    # Keep exchanging until a side runs out of pieces
+                    if attackers_turn:
+                        score -= d_material.pop(0)
+                        attackers_turn = False
+                        if score >= 0: # Defender can stop exchanging while not down in material, which is fine.
+                            full_exchange = False
+                            break
+                    else:
+                        score += a_material.pop(0)
+                        attackers_turn = True
+                        if score < 0: # Attacker can stop exchanging while up in material, which is bad.
+                            underdefended_pieces[color].append((chess.square_name(sq), piece))
+                            full_exchange = False
+                            break
+
+                if full_exchange:
+                    if score < 0: # Defender is down material after a full exchange, which is bad.
+                        underdefended_pieces[color].append((chess.square_name(sq), piece))
+
+    return underdefended_pieces
 
 
 def extract_features_before_after(fen: str, move: chess.Move) -> dict:
@@ -96,7 +146,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     - is_promotion: bool if move promotes
     - pins_before: dict {"white": n, "black": n} Number of 'squares pinned to king' before move
     - castling_rights_before: dict of castling rights before move
-    - ud_material_before: dict {"white": n, "black": n} Number of underdefended pieces before move
+    - ud_material_before: dict {"white": [(sq, piece), ...], "black": [(sq, piece), ...]} Underdefended pieces before move
     
         After-move info:
     - in_check_after: bool after move
@@ -107,7 +157,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     - castling_rights_after: dict of castling rights after move
     - castling_rights_lost: dict of which castling rights were lost due to the move
     - king_exposed: bool if king is exposed after move - could use refinement, ie before+after
-    - ud_material_after: dict {"white": n, "black": n} Number of underdefended pieces after move
+    - ud_material_after: dict {"white": [(sq, piece), ...], "black": [(sq, piece), ...]} Underdefended pieces after move
     
         Game termination flags:
     - is_checkmate_after: bool if move results in checkmate
