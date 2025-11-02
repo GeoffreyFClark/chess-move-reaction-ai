@@ -29,9 +29,28 @@ def king_exposed_heuristic(board: chess.Board, side: bool) -> bool:
     king_sq = board.king(side)
     if king_sq is None:
         return False
+    
     neighbors = [sq for sq in chess.SQUARES if chess.square_distance(sq, king_sq) == 1]
-    attacks = sum(1 for sq in neighbors if board.is_attacked_by(not side, sq))
-    return attacks >= 4
+    attacks = sum(1 for sq in neighbors if board.is_attacked_by(not side, sq)) # Attack count for current neighboring squares
+    unattacked = (sq for sq in neighbors if not board.is_attacked_by(not side, sq))
+
+    # Extend the king safety heuristic by including whether the king's escape squares shrink.
+    # Idea: For every unattacked neighboring square, calculate attack score, if the attack score is greater it means moving to that square is more dangerous. Store this info in a dictionary.
+
+    attack_dict = {}
+
+    for neighbor_sq in unattacked:
+        sq_to_check = neighbor_sq
+        board_copy = board.copy(stack=False)
+        board_copy.remove_piece_at(king_sq)
+        board_copy.set_piece_at(sq_to_check, chess.Piece(chess.KING, side))
+
+        neighbors = [sq for sq in chess.SQUARES if chess.square_distance(sq, sq_to_check) == 1]
+        neighbor_attacks = sum(1 for sq in neighbors if board_copy.is_attacked_by(not side, sq)) # Attack count for unattacked neighbor's neighboring squares
+        if neighbor_attacks > attacks:
+            attack_dict[sq_to_check] = neighbor_attacks - attacks
+
+    return attack_dict
 
 def count_pins(board: chess.Board) -> dict:
     """Count 'squares pinned to king' for each side using python-chess board.is_pinned().
@@ -203,18 +222,11 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
 
     return features
 
-
-# For parse_moves, are we leaving the exceptions as the general type "ValueError" ? Or would it be better to specify specific errors like InvalidMoveError, IllegalMoveError, and AmbiguousMoveError ?
-# I plan on implementing mobility feature which evaluates how many legal moves each side has.
-# Center control.
-# Extend the king safety heuristic by including whether the king's escape squares shrink.
 # Roughly check for doubled, isolated, and passed pawns.
 
 # ------------ Comments from review ------------ #
 
 # Thanks, your plans regarding feature extraction sound good to add! Other quick ideas: 
-# - measure pinned piece count - board.is_pinned() 
-# - Castling-rights lost flags - board.has_castling_rights() 
 # - King-ring pressure (attackers on the 8 surrounding squares i.e. defending pawns) - board.attackers()
 # - Check flags (is the side to move in check or giving check after a move)
 # - Identifying when pieces are placed on undefended squares
