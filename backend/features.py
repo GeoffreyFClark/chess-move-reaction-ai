@@ -216,8 +216,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["material_delta"] = features["material_after"] - features["material_before"]
     features["pins_after"] = count_pins(board)
     features["castling_rights_after"] = get_castling_rights(board)
-    features["castling_rights_lost"] = {color: rights - features["castling_rights_after"].get(color, 0)
-                                         for color, rights in features["castling_rights_before"].items()}
+    features["castling_rights_lost"] = castling_rights_lost(features["castling_rights_before"], features["castling_rights_after"])
     features["king_exposed"] = king_exposed_heuristic(board, side=(board.turn ^ 1))
     features["ud_material_after"] = ud_material(board)
     features["mobility_after"] = dict(zip(["white", "black"], get_mobility_scores(board)))
