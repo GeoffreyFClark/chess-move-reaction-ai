@@ -36,18 +36,6 @@ export default function App() {
     setHistory([]);
   }
 
-  function undo() {
-    const g = new Chess();
-    g.load(fen);
-    const m = g.undo();
-    if (m) {
-      setFen(g.fen());
-      setGamePly((n) => n + 1);
-      setHistory((h) => h.slice(0, -1));
-      setResult(null);
-    }
-  }
-
   async function analyzeMoveAndAdvance(move: Move) {
     setLoading(true);
     setError(null);
@@ -132,7 +120,6 @@ export default function App() {
           />
           <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={setStart} disabled={loading}>Reset</button>
-            <button onClick={undo} disabled={loading}>Undo</button>
             <small style={{ opacity: 0.7 }}>FEN:</small>
             <input
               value={fen}
