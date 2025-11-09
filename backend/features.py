@@ -166,6 +166,8 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     - pins_before: dict {"white": n, "black": n} Number of 'squares pinned to king' before move
     - castling_rights_before: dict of castling rights before move
     - ud_material_before: dict {"white": [(sq, piece), ...], "black": [(sq, piece), ...]} Underdefended pieces before move
+    - mobility_before: dict move counts per side before move
+    - center_control_before: dict counts of moves hitting {d4,e4,d5,e5}
     
         After-move info:
     - in_check_after: bool after move
@@ -177,6 +179,8 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     - castling_rights_lost: dict of which castling rights were lost due to the move
     - king_exposed: bool if king is exposed after move - could use refinement, ie before+after
     - ud_material_after: dict {"white": [(sq, piece), ...], "black": [(sq, piece), ...]} Underdefended pieces after move
+    - mobility_after: dict move counts per side after move
+    - center_control_after: dict counts of moves hitting {d4,e4,d5,e5}
     
         Game termination flags:
     - is_checkmate_after: bool if move results in checkmate
@@ -199,6 +203,8 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["pins_before"] = count_pins(board)
     features["castling_rights_before"] = get_castling_rights(board)
     features["ud_material_before"] = ud_material(board)
+    features["mobility_before"] = dict(zip(["white", "black"], get_mobility_scores(board)))
+    features["center_control_before"] = dict(zip(["white", "black"], get_center_control_scores(board)))
 
     # Execute the move
     board.push(move)
@@ -214,6 +220,8 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
                                          for color, rights in features["castling_rights_before"].items()}
     features["king_exposed"] = king_exposed_heuristic(board, side=(board.turn ^ 1))
     features["ud_material_after"] = ud_material(board)
+    features["mobility_after"] = dict(zip(["white", "black"], get_mobility_scores(board)))
+    features["center_control_after"] = dict(zip(["white", "black"], get_center_control_scores(board)))
 
     # Game termination flags
     features["is_checkmate_after"] = board.is_checkmate()

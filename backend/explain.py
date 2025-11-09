@@ -136,16 +136,6 @@ def explain_move(fen: str, move_str: str) -> dict:
     if is_configured():
         engine = analyze_with_stockfish_before_after(fen, fen_after, depth=None)
         details["engine"] = engine
-        # Optional: fold eval swing into the text if both cp scores are present
-        try:
-            b = engine["before"]
-            a = engine["after"]
-            if b.get("ok") and a.get("ok") and b.get("score_centipawn") is not None and a.get("score_centipawn") is not None:
-                swing = a["score_centipawn"] - b["score_centipawn"]
-                sign = "+" if swing >= 0 else ""
-                reaction += f" (Eval: {b['score_centipawn']/100:.2f} → {a['score_centipawn']/100:.2f}, Δ {sign}{swing/100:.2f})."
-        except Exception:
-            pass
     else:
         details["engine"] = {"enabled": False, "note": "Set STOCKFISH_PATH to enable engine evals."}
 

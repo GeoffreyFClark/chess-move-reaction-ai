@@ -101,8 +101,15 @@ export default function App() {
     const aStr = (a.score_centipawn !== null && a.score_centipawn !== undefined)
       ? (a.score_centipawn/100).toFixed(2)
       : (a.mate_in ? `#${a.mate_in}` : "n/a");
+    let deltaStr = "n/a";
+    if (a.score_centipawn !== null && a.score_centipawn !== undefined &&
+        b.score_centipawn !== null && b.score_centipawn !== undefined) {
+      const delta = (a.score_centipawn - b.score_centipawn) / 100;
+      const sign = delta >= 0 ? "+" : "";
+      deltaStr = `${sign}${delta.toFixed(2)}`;
+    }
     evalBox = (
-      <p><strong>Engine (d{engine.depth}):</strong> {bStr} → {aStr}, best {a.bestmove || "?"}</p>
+      <p><strong>Stockfish depth {engine.depth}:</strong> {bStr} → {aStr}, Δ {deltaStr}</p>
     );
   }
 
