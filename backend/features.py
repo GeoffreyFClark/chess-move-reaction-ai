@@ -246,24 +246,24 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
 
 def get_mobility_scores(board: chess.Board) -> tuple[int, int]:
     """Evaluates each side's mobility based on the number of available moves per side."""
-    white_score, black_score = 0, 0
-    for move in board.legal_moves:
-        color = board.color_at(move.from_square)
-        if color is chess.WHITE:
-            white_score += 1
-        elif color is chess.BLACK:
-            black_score += 1
-    return white_score, black_score
+    def count_moves(color: bool) -> int:
+        copy = board.copy(stack=False)
+        copy.turn = color
+        return sum(1 for _ in copy.legal_moves)
+
+    return count_moves(chess.WHITE), count_moves(chess.BLACK)
 
 def get_center_control_scores(board: chess.Board) -> tuple[int, int]:
     """Evaluates each side's center control based on the number of moves that are attacking the center squares: d4, e4, d5, e5."""
     center_squares = {'d4', 'e4', 'd5', 'e5'}
-    white_score, black_score = 0, 0
-    for move in board.legal_moves:
-        color = board.color_at(move.from_square)
-        if chess.square_name(move.to_square) in center_squares:
-            if color == chess.WHITE:
-                white_score += 1
-            elif color is chess.BLACK:
-                black_score += 1
-    return white_score, black_score
+
+    def count_center_moves(color: bool) -> int:
+        copy = board.copy(stack=False)
+        copy.turn = color
+        total = 0
+        for move in copy.legal_moves:
+            if chess.square_name(move.to_square) in center_squares:
+                total += 1
+        return total
+
+    return count_center_moves(chess.WHITE), count_center_moves(chess.BLACK)
