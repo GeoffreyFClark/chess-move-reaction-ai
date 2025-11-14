@@ -1,4 +1,5 @@
 import chess
+import random
 from features import extract_features_before_after
 from settings import settings
 from engine import analyze_with_stockfish_before_after, is_configured
@@ -30,10 +31,82 @@ TEMPLATES = {
     ]
 }
 
+ENGINE_TONE_BANK = {
+    "excellent": [ # <0.15 delta
+        "Excellent move.",
+        "This is a very precise move.",
+        "This is one of the top moves."
+    ],
+    "good": [ # 0.15 to 0.35 delta
+        "Good move.",
+        "A solid choice.",
+        "Not the best move, but still good according to the engine."
+    ],
+    "okay": [ # 0.36 to 0.55 delta
+        "Okay move.",
+        "This move is not great, but it's playable.",
+        "This is serviceable play, though stronger moves existed."
+    ],
+    "mistake": [ # 0.56 to 0.99 delta
+        "Mistake detected.",
+        "The engine disapproves.",
+        "A noticeable evaluation drop from the engine."
+    ],
+    "blunder": [ # 1.0+ delta
+        "Blunder!",
+        "This move is a blunder.",
+        "A significant blunder according to the engine."
+    ]
+}
+
+ENGINE_TONE_THRESHOLDS = [
+    (0.15, "excellent"),
+    (0.35, "good"),
+    (0.55, "okay"),
+    (0.99, "mistake"),
+]
+
 def pick_line(key: str) -> str:
-    """Pick a template line for the given key."""
     arr = TEMPLATES.get(key, TEMPLATES["neutral"])
+    return random.choice(arr)
+
+def pick_engine_line(tone: str) -> str:
+    if tone and tone in ENGINE_TONE_BANK:
+        return random.choice(ENGINE_TONE_BANK[tone])
+    return ""
+
+def summarize_engine(engine: dict | None, mover: str) -> dict:
+    summary = {
+        "available": False,
+        "tone": None,
+        "delta_cp": None,
+        "before_cp": None,
+        "after_cp": None,
+    }
+    if not engine or not engine.get("enabled"):
+        return summary
+    before = engine.get("before", {})
+    after = engine.get("after", {})
+    if not before.get("ok") or not after.get("ok"):
+        return summary
+
+    def orient(value: int | None) -> int | None:
+        if value is None:
+            return None
+        return value if is_white_mover else -value
+
+    def tone_from_delta(delta_pawns: float) -> str:
+        delta_abs = abs(delta_pawns)
+        for limit, tone in ENGINE_TONE_THRESHOLDS:
+            if delta_abs <= limit:
+                return tone
+        return "blunder"
+
     return arr[0]
+
+def add_reason(reasons: list[str], text: str):
+    if text and text not in reasons:
+        reasons.append(text)
 
 def explain_move(fen: str, move_str: str) -> dict:
     """Given a FEN and a move (in SAN or UCI), return an explanation dict with:
@@ -136,8 +209,12 @@ def explain_move(fen: str, move_str: str) -> dict:
     if is_configured():
         engine = analyze_with_stockfish_before_after(fen, fen_after, depth=None)
         details["engine"] = engine
+        engine_summary = summarize_engine(engine, mover)
+        details["engine_summary"] = engine_summary
     else:
+        engine_summary = {"available": False, "tone": None}
         details["engine"] = {"enabled": False, "note": "Set STOCKFISH_PATH to enable engine evals."}
+        details["engine_summary"] = engine_summary
 
     return {
         "normalized_move": normalized_move,
