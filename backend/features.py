@@ -1,5 +1,17 @@
 import chess
 
+ROOK_HOME_SQUARES = {
+    chess.WHITE: {"k": chess.H1, "q": chess.A1},
+    chess.BLACK: {"k": chess.H8, "q": chess.A8},
+}
+
+def king_zone_files(square: int | None) -> set[int]:
+    """Return the mover king's file plus any adjacent files, clamped to the 0-7 board range."""
+    if square is None:
+        return set()
+    file_idx = chess.square_file(square)
+    return set(range(max(0, file_idx - 1), min(7, file_idx + 1) + 1))
+
 def parse_move(board: chess.Board, move_str: str) -> chess.Move:
     """ Handle both Standard Algebraic Notation(SAN) first, then Universal Chess Interface(UCI).
     SAN for human convenience (CLI and tests), UCI for compatibility with engines and APIs.

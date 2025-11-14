@@ -1,10 +1,10 @@
 # Chess Move Reaction AI
-Chess engines give raw scores and best lines, but not explanations, reasons, or reactions. Many chess players would appreciate AI that feels like a coach or informed spectator: it evaluates a move and reacts with both logic and tone (“Great tactic! That move creates immediate pressure and improves your material situation.” or “Prudent choice — this improves your position and reduces risk.” or “Careful — that square is dangerous; your piece may be in danger.”). Beyond the scope of this project, the concept could be expanded into customized spectator/companion bots, i.e. famous players or commentators.
+Chess engines give raw scores and best lines, but not explanations, reasons, or reactions. Many chess players would appreciate AI that feels like a coach or informed spectator: it evaluates a move and reacts with both logic and tone (“Prudent choice! That move improves your position because of x, y, z.” or “Careful. That square is dangerous, your piece may be in danger.”). Beyond the scope of this project, the concept could be expanded into customized spectator/companion bots, i.e. famous players or commentators.
 
 ## Prereqs
 - Node.js
 - Python 3
-- (Later) Stockfish binary
+- Optional: Stockfish 17.1 binary (Included in this repository's backend)
 
 ## Run Python venv and install requirements
 ```bash
@@ -20,26 +20,26 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Run backend
-```bash
-uvicorn app:app --reload --port 8000
-```
-
 ## CLI usage (no server required)
 ```bash
 # i.e. Starting position and move 1. e4
 python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" --move "e4"
 ```
 
+## Run backend
+```bash
+uvicorn app:app --reload --port 8000
+```
+
 ## Run frontend (new terminal)
 ```bash
-cd /frontend
+cd frontend
 npm install
 npm run dev
 ```
 
 ## Notes
-- v1 uses first order logic and propositional logic based on features extracted via `python-chess`
+- v1 uses heuristics, first order logic, and propositional logic based on features extracted via `python-chess`
 - Stockfish is **optional**... When configured, engine before/after evals are attached to the response.
 - API: `POST /api/analyze` with `{ "fen": "...", "move": "Nf3|g1f3" }` returns `{ ok, normalized_move, reaction, details }`.
 - Can be used via CLI or via `react-chessboard` + `chess.js` frontend for drag-and-drop moves.
