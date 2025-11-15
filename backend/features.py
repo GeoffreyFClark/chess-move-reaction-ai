@@ -12,6 +12,14 @@ def king_zone_files(square: int | None) -> set[int]:
     file_idx = chess.square_file(square)
     return set(range(max(0, file_idx - 1), min(7, file_idx + 1) + 1))
 
+def piece_undefended(board: chess.Board, square: int, color: bool) -> tuple[bool, chess.Piece | None]:
+    """Return (True, piece) if the piece of `color` on `square` has zero defenders."""
+    piece = board.piece_at(square)
+    if not piece or piece.color != color:
+        return False, None
+    defenders = board.attackers(color, square)
+    return len(defenders) == 0, piece
+
 def parse_move(board: chess.Board, move_str: str) -> chess.Move:
     """ Handle both Standard Algebraic Notation(SAN) first, then Universal Chess Interface(UCI).
     SAN for human convenience (CLI and tests), UCI for compatibility with engines and APIs.

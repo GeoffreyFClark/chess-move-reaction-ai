@@ -1,69 +1,71 @@
 import chess
 import random
-from features import extract_features_before_after
-from settings import settings
+from features import extract_features_before_after, king_zone_files, ROOK_HOME_SQUARES, piece_undefended
 from engine import analyze_with_stockfish_before_after, is_configured
 
 TEMPLATES = {
     "great_tactic": [
-        "Great tactic! That move creates immediate pressure and improves your material situation."
+        "Tactical shot."
     ],
     "solid_improvement": [
-        "Prudent choice — this improves your position and reduces risk."
+        "Improving move."
     ],
     "warning_hanging": [
-        "Careful — that square is dangerous; your piece may be in danger."
+        "Loose piece warning."
     ],
     "blunderish": [
-        "This looks like a serious mistake — the tactic against you is strong."
+        "Likely mistake."
     ],
     "neutral": [
-        "Reasonable — keeps the balance without forcing matters."
+        "Balanced move."
     ],
     "mate_for": [
-        "Checkmate! Beautiful finish — the game is over."
+        "Checkmate."
     ],
     "mate_against": [
-        "Careful — this line allows a forced mate against you."
+        "Mate threat against you."
     ],
     "stalemate": [
-        "Stalemate — the game ends in a draw."
+        "Stalemate."
+    ],
+    "game_continues": [
+        "Game continues."
     ]
 }
 
 ENGINE_TONE_BANK = {
-    "excellent": [ # <0.15 delta
+    "excellent": [ # <0.2 delta
         "Excellent move.",
         "This is a very precise move.",
         "This is one of the top moves."
     ],
-    "good": [ # 0.15 to 0.35 delta
+    "good": [ # 0.2 to 0.44 delta
         "Good move.",
         "A solid choice.",
-        "Not the best move, but still good according to the engine."
+        "Not the absolute best option, but still good."
     ],
-    "okay": [ # 0.36 to 0.55 delta
-        "Okay move.",
+    "okay": [ # 0.45 to 0.74 delta
+        "Okay move. There were stronger alternatives.",
         "This move is not great, but it's playable.",
         "This is serviceable play, though stronger moves existed."
     ],
-    "mistake": [ # 0.56 to 0.99 delta
+    "mistake": [ # 0.75 to 1.24 delta
         "Mistake detected.",
         "The engine disapproves.",
         "A noticeable evaluation drop from the engine."
     ],
-    "blunder": [ # 1.0+ delta
-        "Blunder!",
-        "This move is a blunder.",
+    "blunder": [ # 1.25+ delta
+        "Blunder! This move can be punished severely.",
+        "This move is a blunder and leads to a disadvantage.",
         "A significant blunder according to the engine."
     ]
 }
 
 ENGINE_TONE_THRESHOLDS = [
-    (0.15, "excellent"),
-    (0.35, "good"),
-    (0.55, "okay"),
-    (0.99, "mistake"),
+    (0.19, "excellent"),
+    (0.44, "good"),
+    (0.74, "okay"),
+    (1.24, "mistake"),
 ]
 
 def pick_line(key: str) -> str:
@@ -74,6 +76,21 @@ def pick_engine_line(tone: str) -> str:
     if tone and tone in ENGINE_TONE_BANK:
         return random.choice(ENGINE_TONE_BANK[tone])
     return ""
+
+def describe_piece(piece: chess.Piece) -> str:
+    names = {
+        chess.PAWN: "Pawn",
+        chess.KNIGHT: "Knight",
+        chess.BISHOP: "Bishop",
+        chess.ROOK: "Rook",
+        chess.QUEEN: "Queen",
+        chess.KING: "King",
+    }
+    return names.get(piece.piece_type, "Piece")
+
+def add_reason(reasons: list[str], text: str):
+    if text and text not in reasons:
+        reasons.append(text)
 
 def summarize_engine(engine: dict | None, mover: str) -> dict:
     summary = {
@@ -148,12 +165,15 @@ def explain_move(fen: str, move_str: str) -> dict:
     except ValueError as e:
         raise ValueError(f"Invalid move: {move_str}") from e
 
+    moving_piece = board.piece_at(move.from_square)
     feats = extract_features_before_after(fen, move)
 
     mover = feats["turn"]
     mover_key = "white" if mover == "White" else "black"
     opponent_key = "black" if mover_key == "white" else "white"
     material_delta_from_mover = feats["material_delta"] if mover == "White" else -feats["material_delta"]
+    material_balance_before = feats["material_before"] if mover == "White" else -feats["material_before"]
+    material_balance_after = feats["material_after"] if mover == "White" else -feats["material_after"]
 
     ud_material_from_mover_before = feats["ud_material_before"][mover_key]
     ud_material_from_mover = feats["ud_material_after"][mover_key]
@@ -169,6 +189,22 @@ def explain_move(fen: str, move_str: str) -> dict:
     board_after = chess.Board(fen)
     board_after.push(move)
     fen_after = board_after.fen()
+
+    if is_configured():
+        engine_result = analyze_with_stockfish_before_after(fen, fen_after, depth=None)
+    else:
+        engine_result = {"enabled": False, "note": "Set STOCKFISH_PATH to enable engine evals."}
+    engine_summary = summarize_engine(engine_result, mover)
+
+    engine_eval_ready = engine_summary.get("before_cp") is not None and engine_summary.get("after_cp") is not None
+    if engine_eval_ready:
+        eval_before = engine_summary["before_cp"] / 100.0
+        eval_after = engine_summary["after_cp"] / 100.0
+    else:
+        eval_before = material_balance_before
+        eval_after = material_balance_after
+    eval_delta = eval_after - eval_before
+    eval_drop = abs(eval_delta) >= 0.25
 
     capture_destination = chess.square_name(move.to_square)
     opponent_moves_after = list(board_after.legal_moves)
@@ -190,17 +226,13 @@ def explain_move(fen: str, move_str: str) -> dict:
         key = "stalemate"
         reasons = ["Both sides lack mating material, so the game is drawn."]
     else:
-        key = "neutral"
+        key = "game_continues"
         reasons: list[str] = []
-        if feats["is_capture"] or feats["is_check_move"]:
-            if material_delta_from_mover > 0:
+        if feats["is_capture"]:
                 key = "great_tactic"
-            elif material_delta_from_mover < 0:
-                key = "blunderish"
-            else:
+            elif material_balance_after > material_balance_before:
                 key = "solid_improvement"
-        else:
-            if feats["king_exposed"]:
+            else:
                 key = "warning_hanging"
             elif material_delta_from_mover > 0:
                 key = "solid_improvement"
@@ -258,35 +290,32 @@ def explain_move(fen: str, move_str: str) -> dict:
         mob_delta_mover = mobility_after[mover_key] - mobility_before[mover_key]
         mob_delta_opp = mobility_after[opponent_key] - mobility_before[opponent_key]
         if mob_delta_mover >= 3:
-            reasons.append("Your pieces gain significant mobility.")
-        elif mob_delta_mover <= -3:
-            reasons.append("This choice limits your own piece activity.")
+            add_reason(reasons, "Your pieces gain mobility options.")
+        elif mob_delta_mover <= -5:
+            add_reason(reasons, "This choice limits your own piece activity.")
         if mob_delta_opp <= -3:
-            reasons.append("The opponent's options shrink after this move.")
+            add_reason(reasons, "The opponent's options are more limited after this move.")
 
         center_before = feats["center_control_before"]
         center_after = feats["center_control_after"]
         center_delta_mover = center_after[mover_key] - center_before[mover_key]
         center_delta_opp = center_after[opponent_key] - center_before[opponent_key]
         both_center_drop = center_delta_mover <= -1 and center_delta_opp <= -1
-        if center_delta_mover >= 1:
-            reasons.append("You tighten control of the central squares.")
+        if center_delta_mover >= 2:
+            add_reason(reasons, "You increase control of the central squares.")
         elif both_center_drop:
-            reasons.append("Central control is balanced.")
-        elif center_delta_mover <= -1:
-            reasons.append("Central influence slips a bit here.")
+            add_reason(reasons, "Central control is balanced.")
+        elif center_delta_mover <= -2:
+            add_reason(reasons, "Central influence decreases a bit here.")
         if not both_center_drop and center_delta_opp <= -1:
-            reasons.append("Your opponent's center control declines.")
+            add_reason(reasons, "Your opponent's center control declines.")
 
         pins_before = feats["pins_before"]
         pins_after = feats["pins_after"]
         if pins_after[opponent_key] > pins_before[opponent_key]:
-            reasons.append("You add pressure by pinning another enemy piece.")
+            add_reason(reasons, "Note that you have increased pins against your opponent.")
         if pins_after[mover_key] > pins_before[mover_key]:
-            reasons.append("More of your pieces become pinned, increasing tactical risk.")
-
-        if feats["in_check_after"]:
-            reasons.append("You leave your opponent in check.")
+            add_reason(reasons, "Note that pins against you have increased.")
 
     base_headline = pick_line(key)
     reason_text = " ".join(reasons).strip()
