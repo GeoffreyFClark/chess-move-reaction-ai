@@ -228,62 +228,111 @@ def explain_move(fen: str, move_str: str) -> dict:
     else:
         key = "game_continues"
         reasons: list[str] = []
+
         if feats["is_capture"]:
+            winning_cleanly = (
+                material_balance_after > material_balance_before
+                and material_balance_after > 0
+                and not immediate_recapture_possible
+            )
+            if winning_cleanly:
+                add_reason(reasons, "You win material outright.")
+            elif engine_eval_ready and material_delta_from_mover <= 0 and not eval_drop:
+                add_reason(reasons, "Engine expects the initiative to justify the capture.")
+            if immediate_recapture_possible:
+                add_reason(reasons, "Expect an immediate recapture that cancels the gain.")
+            if not immediate_recapture_possible and capturing_piece_loose:
+                add_reason(reasons, "The capturing piece may be chased away.")
+
+            if eval_drop:
+                add_reason(reasons, "The capture may not be justified.")
+                key = "blunderish"
+            elif winning_cleanly:
                 key = "great_tactic"
             elif material_balance_after > material_balance_before:
                 key = "solid_improvement"
             else:
+                add_reason(reasons, "It simplifies material without changing the balance.")
+                key = "neutral"
+        elif feats["is_check_move"]:
+            if eval_drop:
+                key = "warning_hanging"
+            else:
+                key = "great_tactic"
+        else:
+            if feats["king_exposed"] or eval_drop:
                 key = "warning_hanging"
             elif material_delta_from_mover > 0:
                 key = "solid_improvement"
             else:
                 key = "neutral"
 
-        if feats["is_capture"]:
-            if material_delta_from_mover > 0:
-                reasons.append("It trades material in your favor.")
-            elif material_delta_from_mover < 0:
-                reasons.append("The capture may not be justified tactically.")
-            else:
-                reasons.append("It simplifies material without changing the balance.")
-            if immediate_recapture_possible:
-                reasons.append("The captured square can be contested immediately, so stay alert.")
-            if capturing_piece_loose:
-                reasons.append("The capturing piece is loose and could be chased away.")
         if feats["is_check_move"]:
-            reasons.append("Forcing check increases pressure on the opponent's king.")
+            add_reason(reasons, "You check the opponent's king, forcing a response.")
         if feats["is_promotion"]:
-            reasons.append("Promotion escalates your attack with fresh material.")
+            add_reason(reasons, "Promotion increases your material!")
         if material_delta_from_mover >= 2:
-            reasons.append("You win a large chunk of material with this sequence.")
+            add_reason(reasons, "You win material.")
         elif material_delta_from_mover <= -2:
-            reasons.append("Material losses here are severe; compensation must be immediate.")
-        elif material_delta_from_mover == 1:
-            if immediate_recapture_possible or capturing_piece_loose:
-                reasons.append("The extra pawn is tenuous and may be lost again soon.")
-            else:
-                reasons.append("You come out a pawn ahead.")
+            add_reason(reasons, "Material losses.")
         elif material_delta_from_mover == -1:
-            reasons.append("You give up a pawn for activity.")
-        if feats["king_exposed"]:
-            reasons.append("It may loosen king safety.")
+            add_reason(reasons, "Slight material loss.")
 
-        for piece in ud_material_from_mover_no_longer:
-            reasons.append(f"Your {piece[1]} at {piece[0]} is no longer underdefended!")
-        for piece in ud_material_from_mover:
-            reasons.append(f"You have an underdefended {piece[1]} at {piece[0]}!")
-        for piece in ud_material_from_nonmover:
-            reasons.append(f"Your opponent has an underdefended {piece[1]} at {piece[0]}!")
+        mover_color = chess.WHITE if mover == "White" else chess.BLACK
+        king_files_nearby = king_zone_files(board.king(mover_color)) | king_zone_files(board_after.king(mover_color))
+
+        pawn_near_king = (
+            moving_piece
+            and moving_piece.piece_type == chess.PAWN
+            and king_files_nearby
+            and chess.square_file(move.from_square) in king_files_nearby
+        )
+        king_move = moving_piece and moving_piece.piece_type == chess.KING
+        if feats["king_exposed"] and (king_move or pawn_near_king):
+            add_reason(reasons, "It may loosen king safety.")
+
+        for sq, piece in ud_material_from_mover_no_longer:
+            add_reason(reasons, f"Your {describe_piece(piece)} at {sq} is no longer underdefended.")
+        for sq, piece in ud_material_from_mover:
+            add_reason(reasons, f"You have an underdefended {describe_piece(piece)} at {sq}.")
+        for sq, piece in ud_material_from_nonmover:
+            add_reason(reasons, f"Your opponent has an underdefended {describe_piece(piece)} at {sq}.")
 
         castling_lost = feats["castling_rights_lost"]
-        if castling_lost.get(f"{mover_key}_can_castle_k_lost"):
-            reasons.append("You can no longer castle kingside.")
-        if castling_lost.get(f"{mover_key}_can_castle_q_lost"):
-            reasons.append("Queenside castling is now off the table for you.")
-        if castling_lost.get(f"{opponent_key}_can_castle_k_lost"):
-            reasons.append("You stripped your opponent's kingside castling rights.")
-        if castling_lost.get(f"{opponent_key}_can_castle_q_lost"):
-            reasons.append("The opponent can no longer castle queenside.")
+        mover_lost_k = castling_lost.get(f"{mover_key}_can_castle_k_lost")
+        mover_lost_q = castling_lost.get(f"{mover_key}_can_castle_q_lost")
+        opponent_lost_k = castling_lost.get(f"{opponent_key}_can_castle_k_lost")
+        opponent_lost_q = castling_lost.get(f"{opponent_key}_can_castle_q_lost")
+
+        is_castling_move = board.is_castling(move)
+        king_moved_no_castle = (
+            moving_piece
+            and moving_piece.piece_type == chess.KING
+            and not is_castling_move
+        )
+        rook_from_k = (
+            moving_piece
+            and moving_piece.piece_type == chess.ROOK
+            and move.from_square == ROOK_HOME_SQUARES[mover_color]["k"]
+        )
+        rook_from_q = (
+            moving_piece
+            and moving_piece.piece_type == chess.ROOK
+            and move.from_square == ROOK_HOME_SQUARES[mover_color]["q"]
+        )
+
+        if king_moved_no_castle and (mover_lost_k or mover_lost_q):
+            add_reason(reasons, "You can no longer castle.")
+        else:
+            if mover_lost_k and not is_castling_move and rook_from_k:
+                add_reason(reasons, "You can no longer castle kingside.")
+            if mover_lost_q and not is_castling_move and rook_from_q:
+                add_reason(reasons, "Queenside castling is now off the table for you.")
+
+        if opponent_lost_k:
+            add_reason(reasons, "The opponent can no longer castle kinside.")
+        if opponent_lost_q:
+            add_reason(reasons, "The opponent can no longer castle queenside.")
 
         mobility_before = feats["mobility_before"]
         mobility_after = feats["mobility_after"]
@@ -317,18 +366,17 @@ def explain_move(fen: str, move_str: str) -> dict:
         if pins_after[mover_key] > pins_before[mover_key]:
             add_reason(reasons, "Note that pins against you have increased.")
 
+
+        moved_piece_undefended, moved_piece_after = piece_undefended(board_after, move.to_square, mover_color)
+        if moved_piece_undefended and moved_piece_after:
+            add_reason(reasons, f"Your {describe_piece(moved_piece_after)} at {capture_destination} is undefended.")
+
     base_headline = pick_line(key)
     reason_text = " ".join(reasons).strip()
     reaction = base_headline if not reason_text else f"{base_headline} {reason_text}"
 
     details = feats
-    if is_configured():
-        engine = analyze_with_stockfish_before_after(fen, fen_after, depth=None)
-        details["engine"] = engine
-        engine_summary = summarize_engine(engine, mover)
-    else:
-        engine_summary = {"available": False, "tone": None}
-        details["engine"] = {"enabled": False, "note": "Set STOCKFISH_PATH to enable engine evals."}
+    details["engine"] = engine_result
     details["engine_summary"] = engine_summary
 
     allow_engine_override = key not in {"mate_for", "mate_against", "stalemate"}
