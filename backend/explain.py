@@ -371,6 +371,39 @@ def explain_move(fen: str, move_str: str) -> dict:
         if moved_piece_undefended and moved_piece_after:
             add_reason(reasons, f"Your {describe_piece(moved_piece_after)} at {capture_destination} is undefended.")
 
+        # Trading check
+        if feats["is_capture"] or (feats["material_delta"] == 0 and feats["is_capture"]):
+            raw_score = feats.get("material_raw_before", 0)
+            
+ 
+            mover_is_white = (mover == "White")
+            is_winning = (mover_is_white and raw_score >= 3) or (not mover_is_white and raw_score <= -3)
+            is_losing = (mover_is_white and raw_score <= -3) or (not mover_is_white and raw_score >= 3)
+            
+            # Even trade case
+            if feats["material_delta"] == 0:
+                if is_winning:
+                    key = "solid_improvement"
+                    add_reason(reasons, "Trading simplifies the game when you are ahead.")
+                elif is_losing:
+                    key = "blunderish"
+                    add_reason(reasons, "Trading pieces usually helps the opponent when you are behind.")
+
+        # Opening principles
+        opening_notes = feats.get("opening_notes", [])
+        if "early_queen" in opening_notes:
+            key = "blunderish"
+            add_reason(reasons, "Bringing the Queen out this early makes her a target.")
+        if "moved_twice" in opening_notes:
+            # Nuanced tempo messages
+            add_reason(reasons, "Moving the same piece twice in the opening costs time (tempo).")
+
+        # Blunders
+        if feats.get("is_hanging_to_lesser"):
+            key = "blunderish"
+          
+            add_reason(reasons, "You moved a valuable piece to a square attacked by a pawn or minor piece!")
+
     base_headline = pick_line(key)
     reason_text = " ".join(reasons).strip()
     reaction = base_headline if not reason_text else f"{base_headline} {reason_text}"

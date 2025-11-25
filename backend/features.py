@@ -1,5 +1,7 @@
 import chess
 
+from chess import PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
+
 ROOK_HOME_SQUARES = {
     chess.WHITE: {"k": chess.H1, "q": chess.A1},
     chess.BLACK: {"k": chess.H8, "q": chess.A8},
@@ -226,6 +228,12 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["mobility_before"] = dict(zip(["white", "black"], get_mobility_scores(board)))
     features["center_control_before"] = dict(zip(["white", "black"], get_center_control_scores(board)))
 
+    # Raw material score for reference
+    features["material_raw_before"] = features["material_before"] 
+    
+    features["is_hanging_to_lesser"] = is_hanging_to_lesser_piece(board, move)
+
+    features["opening_notes"] = check_opening_principles(board, move, board.fullmove_number * 2)
     # Execute the move
     board.push(move)
 
@@ -287,3 +295,50 @@ def get_center_control_scores(board: chess.Board) -> tuple[int, int]:
         return total
 
     return count_center_moves(chess.WHITE), count_center_moves(chess.BLACK)
+
+def is_hanging_to_lesser_piece(board: chess.Board, move: chess.Move) -> bool:
+    """Check if you're hanging a high value piece to a lower value piece."""
+    piece = board.piece_at(move.from_square)
+    if not piece: return False
+    
+
+    values = {PAWN: 1, KNIGHT: 3, BISHOP: 3, ROOK: 5, QUEEN: 9, KING: 100}
+    our_val = values.get(piece.piece_type, 0)
+    
+
+    tmp = board.copy(stack=False)
+    tmp.push(move)
+    
+    attackers = tmp.attackers(tmp.turn, move.to_square)
+    for sq in attackers:
+        attacker_piece = tmp.piece_at(sq)
+        if attacker_piece and values.get(attacker_piece.piece_type, 0) < our_val:
+            return True
+    return False
+def check_opening_principles(board: chess.Board, move: chess.Move, ply_count: int) -> list[str]:
+    """Return simple heuristic flags for opening mistakes."""
+    notes = []
+    
+    # Only applying to approximate "opening"
+    if ply_count > 16: return notes
+    
+
+    if len(board.piece_map()) < 10: return notes
+
+    piece = board.piece_at(move.from_square)
+    if not piece: return notes
+
+
+    if piece.piece_type == QUEEN:
+        notes.append("early_queen")
+
+
+    if piece.piece_type not in [PAWN, KING]:
+        is_white = board.turn == chess.WHITE
+        home_rank = 0 if is_white else 7
+        current_rank = chess.square_rank(move.from_square)
+        
+        if current_rank != home_rank:
+             notes.append("moved_twice")
+             
+    return notes
