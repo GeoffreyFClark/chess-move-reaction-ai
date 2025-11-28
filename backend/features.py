@@ -1,5 +1,27 @@
 import chess
 
+from chess import PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
+
+ROOK_HOME_SQUARES = {
+    chess.WHITE: {"k": chess.H1, "q": chess.A1},
+    chess.BLACK: {"k": chess.H8, "q": chess.A8},
+}
+
+def king_zone_files(square: int | None) -> set[int]:
+    """Return the mover king's file plus any adjacent files, clamped to the 0-7 board range."""
+    if square is None:
+        return set()
+    file_idx = chess.square_file(square)
+    return set(range(max(0, file_idx - 1), min(7, file_idx + 1) + 1))
+
+def piece_undefended(board: chess.Board, square: int, color: bool) -> tuple[bool, chess.Piece | None]:
+    """Return (True, piece) if the piece of `color` on `square` has zero defenders."""
+    piece = board.piece_at(square)
+    if not piece or piece.color != color:
+        return False, None
+    defenders = board.attackers(color, square)
+    return len(defenders) == 0, piece
+
 def parse_move(board: chess.Board, move_str: str) -> chess.Move:
     """ Handle both Standard Algebraic Notation(SAN) first, then Universal Chess Interface(UCI).
     SAN for human convenience (CLI and tests), UCI for compatibility with engines and APIs.
@@ -166,6 +188,8 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     - pins_before: dict {"white": n, "black": n} Number of 'squares pinned to king' before move
     - castling_rights_before: dict of castling rights before move
     - ud_material_before: dict {"white": [(sq, piece), ...], "black": [(sq, piece), ...]} Underdefended pieces before move
+    - mobility_before: dict move counts per side before move
+    - center_control_before: dict counts of moves hitting {d4,e4,d5,e5}
     
         After-move info:
     - in_check_after: bool after move
@@ -177,6 +201,8 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     - castling_rights_lost: dict of which castling rights were lost due to the move
     - king_exposed: bool if king is exposed after move - could use refinement, ie before+after
     - ud_material_after: dict {"white": [(sq, piece), ...], "black": [(sq, piece), ...]} Underdefended pieces after move
+    - mobility_after: dict move counts per side after move
+    - center_control_after: dict counts of moves hitting {d4,e4,d5,e5}
     
         Game termination flags:
     - is_checkmate_after: bool if move results in checkmate
@@ -199,7 +225,15 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["pins_before"] = count_pins(board)
     features["castling_rights_before"] = get_castling_rights(board)
     features["ud_material_before"] = ud_material(board)
+    features["mobility_before"] = dict(zip(["white", "black"], get_mobility_scores(board)))
+    features["center_control_before"] = dict(zip(["white", "black"], get_center_control_scores(board)))
 
+    # Raw material score for reference
+    features["material_raw_before"] = features["material_before"] 
+    
+    features["is_hanging_to_lesser"] = is_hanging_to_lesser_piece(board, move)
+
+    features["opening_notes"] = check_opening_principles(board, move, board.fullmove_number * 2)
     # Execute the move
     board.push(move)
 
@@ -210,10 +244,11 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["material_delta"] = features["material_after"] - features["material_before"]
     features["pins_after"] = count_pins(board)
     features["castling_rights_after"] = get_castling_rights(board)
-    features["castling_rights_lost"] = {color: rights - features["castling_rights_after"].get(color, 0)
-                                         for color, rights in features["castling_rights_before"].items()}
+    features["castling_rights_lost"] = castling_rights_lost(features["castling_rights_before"], features["castling_rights_after"])
     features["king_exposed"] = king_exposed_heuristic(board, side=(board.turn ^ 1))
     features["ud_material_after"] = ud_material(board)
+    features["mobility_after"] = dict(zip(["white", "black"], get_mobility_scores(board)))
+    features["center_control_after"] = dict(zip(["white", "black"], get_center_control_scores(board)))
 
     # Game termination flags
     features["is_checkmate_after"] = board.is_checkmate()
@@ -239,24 +274,71 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
 
 def get_mobility_scores(board: chess.Board) -> tuple[int, int]:
     """Evaluates each side's mobility based on the number of available moves per side."""
-    white_score, black_score = 0, 0
-    for move in board.legal_moves:
-        color = board.color_at(move.from_square)
-        if color is chess.WHITE:
-            white_score += 1
-        elif color is chess.BLACK:
-            black_score += 1
-    return white_score, black_score
+    def count_moves(color: bool) -> int:
+        copy = board.copy(stack=False)
+        copy.turn = color
+        return sum(1 for _ in copy.legal_moves)
+
+    return count_moves(chess.WHITE), count_moves(chess.BLACK)
 
 def get_center_control_scores(board: chess.Board) -> tuple[int, int]:
     """Evaluates each side's center control based on the number of moves that are attacking the center squares: d4, e4, d5, e5."""
     center_squares = {'d4', 'e4', 'd5', 'e5'}
-    white_score, black_score = 0, 0
-    for move in board.legal_moves:
-        color = board.color_at(move.from_square)
-        if chess.square_name(move.to_square) in center_squares:
-            if color == chess.WHITE:
-                white_score += 1
-            elif color is chess.BLACK:
-                black_score += 1
-    return white_score, black_score
+
+    def count_center_moves(color: bool) -> int:
+        copy = board.copy(stack=False)
+        copy.turn = color
+        total = 0
+        for move in copy.legal_moves:
+            if chess.square_name(move.to_square) in center_squares:
+                total += 1
+        return total
+
+    return count_center_moves(chess.WHITE), count_center_moves(chess.BLACK)
+
+def is_hanging_to_lesser_piece(board: chess.Board, move: chess.Move) -> bool:
+    """Check if you're hanging a high value piece to a lower value piece."""
+    piece = board.piece_at(move.from_square)
+    if not piece: return False
+    
+
+    values = {PAWN: 1, KNIGHT: 3, BISHOP: 3, ROOK: 5, QUEEN: 9, KING: 100}
+    our_val = values.get(piece.piece_type, 0)
+    
+
+    tmp = board.copy(stack=False)
+    tmp.push(move)
+    
+    attackers = tmp.attackers(tmp.turn, move.to_square)
+    for sq in attackers:
+        attacker_piece = tmp.piece_at(sq)
+        if attacker_piece and values.get(attacker_piece.piece_type, 0) < our_val:
+            return True
+    return False
+def check_opening_principles(board: chess.Board, move: chess.Move, ply_count: int) -> list[str]:
+    """Return simple heuristic flags for opening mistakes."""
+    notes = []
+    
+    # Only applying to approximate "opening"
+    if ply_count > 16: return notes
+    
+
+    if len(board.piece_map()) < 10: return notes
+
+    piece = board.piece_at(move.from_square)
+    if not piece: return notes
+
+
+    if piece.piece_type == QUEEN:
+        notes.append("early_queen")
+
+
+    if piece.piece_type not in [PAWN, KING]:
+        is_white = board.turn == chess.WHITE
+        home_rank = 0 if is_white else 7
+        current_rank = chess.square_rank(move.from_square)
+        
+        if current_rank != home_rank:
+             notes.append("moved_twice")
+             
+    return notes

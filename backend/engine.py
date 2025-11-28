@@ -1,5 +1,6 @@
 import subprocess, re, shutil
 from typing import Optional
+import chess
 from settings import settings
 
 UCI_SCORE_RE = re.compile(r"score (cp|mate) (-?\d+)")
@@ -28,11 +29,17 @@ def _uci_eval(fen: str, depth: int) -> dict:
         p.stdin.flush()
 
     out_lines = []
+    board = chess.Board(fen)
+    go_parts = ["go"]
+    if settings.stockfish_movetime_ms > 0:
+        go_parts += ["movetime", str(settings.stockfish_movetime_ms)]
+    if depth > 0:
+        go_parts += ["depth", str(depth)]
     try:
         send("uci")
         send("isready")
         send(f"position fen {fen}")
-        send(f"go depth {depth}")
+        send(" ".join(go_parts))
         assert p.stdout is not None
         for line in p.stdout:
             out_lines.append(line.rstrip())
@@ -66,7 +73,13 @@ def _uci_eval(fen: str, depth: int) -> dict:
             if len(parts) >= 2:
                 bestmove = parts[1]
 
-    return {"ok": True, "score_centipawn": score_centipawn, "mate_in": mate_in, "bestmove": bestmove, "raw_tail": out_lines[-10:]}
+    sign = 1 if board.turn == chess.WHITE else -1
+    if score_centipawn is not None:
+        score_centipawn *= sign
+    if mate_in is not None:
+        mate_in *= sign
+
+    return {"ok": True, "score_centipawn": score_centipawn, "mate_in": mate_in, "bestmove": bestmove}
 
 def analyze_with_stockfish_before_after(fen: str, fen_after: str, depth: Optional[int] = None) -> dict:
     d = depth or settings.stockfish_depth

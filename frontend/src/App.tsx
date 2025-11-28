@@ -36,18 +36,6 @@ export default function App() {
     setHistory([]);
   }
 
-  function undo() {
-    const g = new Chess();
-    g.load(fen);
-    const m = g.undo();
-    if (m) {
-      setFen(g.fen());
-      setGamePly((n) => n + 1);
-      setHistory((h) => h.slice(0, -1));
-      setResult(null);
-    }
-  }
-
   async function analyzeMoveAndAdvance(move: Move) {
     setLoading(true);
     setError(null);
@@ -113,8 +101,15 @@ export default function App() {
     const aStr = (a.score_centipawn !== null && a.score_centipawn !== undefined)
       ? (a.score_centipawn/100).toFixed(2)
       : (a.mate_in ? `#${a.mate_in}` : "n/a");
+    let deltaStr = "n/a";
+    if (a.score_centipawn !== null && a.score_centipawn !== undefined &&
+        b.score_centipawn !== null && b.score_centipawn !== undefined) {
+      const delta = (a.score_centipawn - b.score_centipawn) / 100;
+      const sign = delta >= 0 ? "+" : "";
+      deltaStr = `${sign}${delta.toFixed(2)}`;
+    }
     evalBox = (
-      <p><strong>Engine (d{engine.depth}):</strong> {bStr} → {aStr}, best {a.bestmove || "?"}</p>
+      <p><strong>Stockfish depth {engine.depth}:</strong> {bStr} → {aStr}, Δ {deltaStr}</p>
     );
   }
 
@@ -132,7 +127,6 @@ export default function App() {
           />
           <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={setStart} disabled={loading}>Reset</button>
-            <button onClick={undo} disabled={loading}>Undo</button>
             <small style={{ opacity: 0.7 }}>FEN:</small>
             <input
               value={fen}
