@@ -227,6 +227,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["ud_material_before"] = ud_material(board)
     features["mobility_before"] = dict(zip(["white", "black"], get_mobility_scores(board)))
     features["center_control_before"] = dict(zip(["white", "black"], get_center_control_scores(board)))
+    features["pawn_structure_before"] = analyze_pawn_structure(board)
 
     # Raw material score for reference
     features["material_raw_before"] = features["material_before"] 
@@ -249,6 +250,7 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     features["ud_material_after"] = ud_material(board)
     features["mobility_after"] = dict(zip(["white", "black"], get_mobility_scores(board)))
     features["center_control_after"] = dict(zip(["white", "black"], get_center_control_scores(board)))
+    features["pawn_structure_after"] = analyze_pawn_structure(board)
 
     # Game termination flags
     features["is_checkmate_after"] = board.is_checkmate()
@@ -342,3 +344,94 @@ def check_opening_principles(board: chess.Board, move: chess.Move, ply_count: in
              notes.append("moved_twice")
              
     return notes
+
+def detect_doubled_pawns(board: chess.Board, color: bool) -> list[str]:
+    """Detect files with multiple pawns of the same color."""
+    doubled_files = []
+    pawns = board.pieces(chess.PAWN, color)
+    
+    for file_idx in range(8):
+        file_pawns = 0
+        for square in pawns:
+            if chess.square_file(square) == file_idx:
+                file_pawns += 1
+        
+        if file_pawns >= 2:
+            doubled_files.append(chess.FILE_NAMES[file_idx])
+    
+    return doubled_files
+
+def detect_isolated_pawns(board: chess.Board, color: bool) -> list[str]:
+    """Detect pawns with no friendly pawns on adjacent files."""
+    isolated_files = []
+    pawns = board.pieces(chess.PAWN, color)
+    
+    for square in pawns:
+        file_idx = chess.square_file(square)
+        has_adjacent_pawn = False
+        
+        # Check adjacent files for friendly pawns
+        for adj_file in [file_idx - 1, file_idx + 1]:
+            if 0 <= adj_file <= 7:
+                for other_square in pawns:
+                    if chess.square_file(other_square) == adj_file:
+                        has_adjacent_pawn = True
+                        break
+                if has_adjacent_pawn:
+                    break
+        
+        if not has_adjacent_pawn:
+            file_name = chess.FILE_NAMES[file_idx]
+            if file_name not in isolated_files:
+                isolated_files.append(file_name)
+    
+    return isolated_files
+
+def detect_passed_pawns(board: chess.Board, color: bool) -> list[str]:
+    """Detect pawns with no enemy pawns blocking their path to promotion."""
+    passed_squares = []
+    pawns = board.pieces(chess.PAWN, color)
+    enemy_pawns = board.pieces(chess.PAWN, not color)
+    
+    for square in pawns:
+        file_idx = chess.square_file(square)
+        rank_idx = chess.square_rank(square)
+        is_passed = True
+        
+        # Check if any enemy pawns can block this pawn's path
+        for enemy_square in enemy_pawns:
+            enemy_file = chess.square_file(enemy_square)
+            enemy_rank = chess.square_rank(enemy_square)
+            
+            # Enemy pawn on same file or adjacent files
+            if abs(enemy_file - file_idx) <= 1:
+                if color == chess.WHITE:
+                    # White pawn: check if enemy pawn is ahead
+                    if enemy_rank > rank_idx:
+                        is_passed = False
+                        break
+                else:
+                    # Black pawn: check if enemy pawn is ahead  
+                    if enemy_rank < rank_idx:
+                        is_passed = False
+                        break
+        
+        if is_passed:
+            passed_squares.append(chess.square_name(square))
+    
+    return passed_squares
+
+def analyze_pawn_structure(board: chess.Board) -> dict:
+    """Analyze pawn structure for both sides."""
+    return {
+        "white": {
+            "doubled": detect_doubled_pawns(board, chess.WHITE),
+            "isolated": detect_isolated_pawns(board, chess.WHITE), 
+            "passed": detect_passed_pawns(board, chess.WHITE)
+        },
+        "black": {
+            "doubled": detect_doubled_pawns(board, chess.BLACK),
+            "isolated": detect_isolated_pawns(board, chess.BLACK),
+            "passed": detect_passed_pawns(board, chess.BLACK)
+        }
+    }
