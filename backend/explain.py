@@ -5,31 +5,49 @@ from engine import analyze_with_stockfish_before_after, is_configured
 
 TEMPLATES = {
     "great_tactic": [
-        "Tactical shot."
+        "Tactical shot.",
+        "Nice tactics!",
+        "Sharp move!"
     ],
     "solid_improvement": [
-        "Improving move."
+        "Improving move.",
+        "Good positional play.",
+        "This strengthens your position."
     ],
     "warning_hanging": [
-        "Loose piece warning."
+        "Loose piece warning.",
+        "Careful! Piece in danger.",
+        "Watch out - loose pieces drop off."
     ],
     "blunderish": [
-        "Likely mistake."
+        "Likely mistake.",
+        "This looks questionable.",
+        "Risky decision here."
     ],
     "neutral": [
-        "Balanced move."
+        "Balanced move.",
+        "Reasonable choice.",
+        "Steady play."
     ],
     "mate_for": [
-        "Checkmate."
+        "Checkmate.",
+        "Game over - checkmate!",
+        "Victory achieved!"
     ],
     "mate_against": [
-        "Mate threat against you."
+        "Mate threat against you.",
+        "Danger - mate on the horizon.",
+        "Critical defensive situation."
     ],
     "stalemate": [
-        "Stalemate."
+        "Stalemate.",
+        "No legal moves - game drawn.",
+        "Draw by stalemate."
     ],
     "game_continues": [
-        "Game continues."
+        "Game continues.",
+        "Play on.",
+        "The position remains dynamic."
     ]
 }
 
@@ -260,7 +278,8 @@ def explain_move(fen: str, move_str: str) -> dict:
             else:
                 key = "great_tactic"
         else:
-            if feats["king_exposed"] or eval_drop:
+            king_safety_concern = bool(feats["king_exposed"]) and len(feats["king_exposed"]) > 0
+            if king_safety_concern or eval_drop:
                 key = "warning_hanging"
             elif material_delta_from_mover > 0:
                 key = "solid_improvement"
@@ -288,8 +307,15 @@ def explain_move(fen: str, move_str: str) -> dict:
             and chess.square_file(move.from_square) in king_files_nearby
         )
         king_move = moving_piece and moving_piece.piece_type == chess.KING
-        if feats["king_exposed"] and (king_move or pawn_near_king):
-            add_reason(reasons, "It may loosen king safety.")
+        king_safety_concern = bool(feats["king_exposed"]) and len(feats["king_exposed"]) > 0
+        if king_safety_concern and (king_move or pawn_near_king):
+            num_dangerous_squares = len(feats["king_exposed"])
+            if num_dangerous_squares >= 3:
+                add_reason(reasons, "This significantly worsens king safety - multiple escape squares become more dangerous.")
+            elif num_dangerous_squares >= 1:
+                add_reason(reasons, "It may loosen king safety - some escape squares become more perilous.")
+            else:
+                add_reason(reasons, "It may loosen king safety.")
 
         for sq, piece in ud_material_from_mover_no_longer:
             add_reason(reasons, f"Your {describe_piece(piece)} at {sq} is no longer underdefended.")
@@ -353,7 +379,7 @@ def explain_move(fen: str, move_str: str) -> dict:
         if center_delta_mover >= 2:
             add_reason(reasons, "You increase control of the central squares.")
         elif both_center_drop:
-            add_reason(reasons, "Central control is balanced.")
+            add_reason(reasons, "Central activity decreases for both sides.")
         elif center_delta_mover <= -2:
             add_reason(reasons, "Central influence decreases a bit here.")
         if not both_center_drop and center_delta_opp <= -1:
@@ -366,6 +392,21 @@ def explain_move(fen: str, move_str: str) -> dict:
         if pins_after[mover_key] > pins_before[mover_key]:
             add_reason(reasons, "Note that pins against you have increased.")
 
+        # Pawn structure analysis
+        pawn_before = feats["pawn_structure_before"]
+        pawn_after = feats["pawn_structure_after"]
+        
+        # Check for new pawn weaknesses created
+        new_doubled = set(pawn_after[mover_key]["doubled"]) - set(pawn_before[mover_key]["doubled"])
+        new_isolated = set(pawn_after[mover_key]["isolated"]) - set(pawn_before[mover_key]["isolated"])
+        new_passed = set(pawn_after[mover_key]["passed"]) - set(pawn_before[mover_key]["passed"])
+        
+        if new_doubled:
+            add_reason(reasons, f"This creates doubled pawns on the {', '.join(new_doubled)}-file(s).")
+        if new_isolated:
+            add_reason(reasons, f"Your pawn on the {', '.join(new_isolated)}-file(s) becomes isolated.")
+        if new_passed:
+            add_reason(reasons, f"You create a passed pawn! ({', '.join(new_passed)})")
 
         moved_piece_undefended, moved_piece_after = piece_undefended(board_after, move.to_square, mover_color)
         if moved_piece_undefended and moved_piece_after:
@@ -395,7 +436,7 @@ def explain_move(fen: str, move_str: str) -> dict:
             key = "blunderish"
             add_reason(reasons, "Bringing the Queen out this early makes her a target.")
         if "moved_twice" in opening_notes:
-            # Nuanced tempo messages
+            key = "blunderish"
             add_reason(reasons, "Moving the same piece twice in the opening costs time (tempo).")
 
         # Blunders
