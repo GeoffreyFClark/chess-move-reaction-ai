@@ -1,5 +1,6 @@
 # Chess Move Reaction AI
-Chess engines give raw scores and best lines, but not explanations, reasons, or reactions. Many chess players would appreciate AI that feels like a coach or informed spectator: it evaluates a move and reacts with both logic and tone (“Prudent choice! That move improves your position because of x, y, z.” or “Careful. That square is dangerous, your piece may be in danger.”). Beyond the scope of this project, the concept could be expanded into customized spectator/companion bots, i.e. famous players or commentators.
+Chess engines give raw quantitative scores and best lines, but not explanations, reasons, or reactions. This results in unengaging feedback that is often unclear to humans. Many chess players would appreciate AI that feels like a coach or informed spectator: it evaluates a move and reacts with both logic and tone (“Great fork! This move wins material.” or “Prudent choice to move your king to a safer square.” or “Careful. That move hangs a piece.”). Beyond the scope of this project, the concept could be expanded into customized spectator/companion bots, i.e. famous players or commentators. This could result in engaging new learning opportunities with regard to chess.
+The aim of our project is to create an early version of a Chess Move Reaction AI. To do this, we aim to represent a chess board state, receive an input chess move, and to extract features from the chess board state that we can then utilize via algorithms, logic, and heuristics in order to generate a text-based reaction with associated reasons. This project was initially intended to be interfaced with via CLI (command-line-interface), but has been expanded to a GUI (graphical user interface) that is clearer, faster, and more intuitive to use.
 
 ## Prereqs
 - Node.js
@@ -47,3 +48,5 @@ python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" -
 - API: `POST /api/analyze` with `{ "fen": "...", "move": "Nf3|g1f3" }` returns `{ ok, normalized_move, reaction, details }`.
 - Can be used via CLI or via `react-chessboard` + `chess.js` frontend for drag-and-drop moves.
 - We accept both SAN (i.e. Nf3 -- human preferred) and UCI (fixed coordinate form i.e. g1f3 -- used by python-chess, engines, etc), store/log moves internally as UCI for consistency, and display explanations in SAN for readability.
+
+## Future 

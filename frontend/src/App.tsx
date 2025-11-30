@@ -114,8 +114,19 @@ export default function App() {
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: "40px auto", fontFamily: "system-ui, Segoe UI, Roboto, Arial" }}>
-      <h1>Chess Move Reaction AI</h1>
+    <div
+      style={{
+        maxWidth: 1100,
+        margin: "40px auto",
+        padding: 24,
+        fontFamily: "system-ui, Segoe UI, Roboto, Arial",
+        borderRadius: 12,
+        boxShadow: "0 12px 30px rgba(15, 23, 42, 0.08)",
+        fontSize: 14,
+        lineHeight: 1.5
+      }}
+    >
+      <h1 style={{ margin: "0 0 16px", fontSize: 26, letterSpacing: "-0.02em", fontWeight: 700, color: "#0f172a" }}>Chess Move Reaction AI</h1>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 560px) 1fr", gap: 24 }}>
         <div>
@@ -126,12 +137,26 @@ export default function App() {
             arePiecesDraggable={!loading}
           />
           <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={setStart} disabled={loading}>Reset</button>
-            <small style={{ opacity: 0.7 }}>FEN:</small>
+            <button
+              onClick={setStart}
+              disabled={loading}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 999,
+                border: "none",
+                backgroundColor: loading ? "#9ca3af" : "#2563eb",
+                color: "#ffffff",
+                fontWeight: 500,
+                cursor: loading ? "default" : "pointer"
+              }}
+            >
+              Reset
+            </button>
+            <small style={{ opacity: 0.7, fontWeight: 500 }}>FEN:</small>
             <input
               value={fen}
               onChange={(e) => setFen(e.target.value)}
-              style={{ flex: 1, minWidth: 0, fontFamily: "monospace", padding: 6 }}
+              style={{ flex: 1, minWidth: 0, fontFamily: "monospace", padding: "6px 10px", borderRadius: 999, border: "1px solid #d1d5db" }}
             />
           </div>
           <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
@@ -140,28 +165,56 @@ export default function App() {
         </div>
 
         <div>
-          <h3>Analysis</h3>
-          {loading && <p>Analyzing…</p>}
-          {error && <p style={{ color: "#b00020" }}><strong>Error:</strong> {error}</p>}
+          <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 600, color: "#111827" }}>Analysis</h3>
+          {loading && <p style={{ color: "#6b7280", fontStyle: "italic", fontSize: 13, marginTop: 4 }}>Analyzing…</p>}
+          {error && (
+            <p
+              style={{
+                color: "#b00020",
+                backgroundColor: "rgba(176, 0, 32, 0.06)",
+                borderRadius: 8,
+                padding: "6px 8px",
+                border: "1px solid rgba(176, 0, 32, 0.25)",
+                marginTop: 8
+              }}
+            >
+              <strong>Error:</strong> {error}
+            </p>
+          )}
           {result && (
-            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16 }}>
-              <p><strong>Move:</strong> {result.normalized_move}</p>
-              <p><strong>Reaction:</strong> {result.reaction}</p>
+            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, backgroundColor: "#f9fafb" }}>
+              <p style={{ margin: 0 }}><strong>Move:</strong> {result.normalized_move}</p>
+              <p style={{ margin: 0 }}><strong>Reaction:</strong> {result.reaction}</p>
               {evalBox}
               <details>
                 <summary>Details</summary>
-                <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(result.details, null, 2)}</pre>
+                <pre
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    backgroundColor: "#0b1120",
+                    color: "#e5e7eb",
+                    padding: 8,
+                    borderRadius: 6,
+                    fontSize: 12,
+                    maxHeight: 240,
+                    overflow: "auto"
+                  }}
+                >
+                  {JSON.stringify(result.details, null, 2)}
+                </pre>
               </details>
             </div>
           )}
           {history.length > 0 && (
             <div style={{ marginTop: 16 }}>
-              <h4>Moves</h4>
-              <p>
+              <h4 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 600 }}>Moves</h4>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, backgroundColor: "#f9fafb" }}>
+                <p style={{ margin: 0, fontFamily: "monospace", fontSize: 13, lineHeight: 1.6 }}>
                 {history.map((m, i) =>
                   i % 2 === 0 ? `${Math.floor(i / 2) + 1}. ${m}` : m
                 ).join(" ")}
-              </p>
+                </p>
+              </div>
             </div>
           )}
         </div>
