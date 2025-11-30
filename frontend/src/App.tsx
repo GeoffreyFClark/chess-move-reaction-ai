@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Chess, Move } from "chess.js";
+import { Chess, Move, PieceSymbol, Color } from "chess.js";
 import { Chessboard } from "react-chessboard";
 
 type AnalyzeResponse = {
@@ -9,161 +9,336 @@ type AnalyzeResponse = {
   details: Record<string, any>;
 };
 
+
+const PIECES = [
+  { type: 'p', color: 'w', symbol: '♙' },
+  { type: 'n', color: 'w', symbol: '♘' },
+  { type: 'b', color: 'w', symbol: '♗' },
+  { type: 'r', color: 'w', symbol: '♖' },
+  { type: 'q', color: 'w', symbol: '♕' },
+  { type: 'k', color: 'w', symbol: '♔' },
+  { type: 'p', color: 'b', symbol: '♟' },
+  { type: 'n', color: 'b', symbol: '♞' },
+  { type: 'b', color: 'b', symbol: '♝' },
+  { type: 'r', color: 'b', symbol: '♜' },
+  { type: 'q', color: 'b', symbol: '♛' },
+  { type: 'k', color: 'b', symbol: '♚' },
+];
+
+function expandFenBoard(fen: string): string[][] {
+  const boardPart = fen.split(' ')[0];
+  const rows = boardPart.split('/');
+  return rows.map(row => {
+    let expanded = "";
+    for (const char of row) {
+      if (/\d/.test(char)) {
+        expanded += "1".repeat(parseInt(char));
+      } else {
+        expanded += char;
+      }
+    }
+    return expanded.split('');
+  });
+}
+
+
+function compressBoardToFen(grid: string[][], originalFen: string): string {
+  const boardString = grid.map(row => {
+    let compressed = "";
+    let emptyCount = 0;
+    for (const char of row) {
+      if (char === '1') {
+        emptyCount++;
+      } else {
+        if (emptyCount > 0) {
+          compressed += emptyCount;
+          emptyCount = 0;
+        }
+        compressed += char;
+      }
+    }
+    if (emptyCount > 0) compressed += emptyCount;
+    return compressed;
+  }).join('/');
+
+
+  const suffix = originalFen.split(' ').slice(1).join(' ') || "w - - 0 1";
+  return `${boardString} ${suffix}`;
+}
+
+
+function manualFenUpdate(currentFen: string, square: string, pieceChar: string | null): string {
+  const file = square.charCodeAt(0) - 'a'.charCodeAt(0); // 0-7
+  const rank = 8 - parseInt(square[1]); 
+
+  const grid = expandFenBoard(currentFen);
+  
+
+  grid[rank][file] = pieceChar || '1';
+
+  return compressBoardToFen(grid, currentFen);
+}
+
+
+function manualFenMove(currentFen: string, source: string, target: string): string {
+  const srcFile = source.charCodeAt(0) - 'a'.charCodeAt(0);
+  const srcRank = 8 - parseInt(source[1]);
+  const tgtFile = target.charCodeAt(0) - 'a'.charCodeAt(0);
+  const tgtRank = 8 - parseInt(target[1]);
+
+  const grid = expandFenBoard(currentFen);
+  
+  const piece = grid[srcRank][srcFile];
+  if (piece === '1') return currentFen; 
+
+  grid[srcRank][srcFile] = '1'; 
+  grid[tgtRank][tgtFile] = piece; 
+
+  return compressBoardToFen(grid, currentFen);
+}
+
+
 export default function App() {
+  // Game
   const [fen, setFen] = useState<string>("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-  const [gamePly, setGamePly] = useState<number>(0);
+  const [isSetupMode, setIsSetupMode] = useState(false);
+  const [selectedPiece, setSelectedPiece] = useState<{type: string, color: string} | null>(null);
+
+  // Analysis 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<string[]>([]); // SAN list
+  const [history, setHistory] = useState<string[]>([]);
+
+  // Validation 
+  const isValidFen = useMemo(() => {
+    try {
+      const c = new Chess();
+      c.load(fen);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [fen]);
 
   const game = useMemo(() => {
     const g = new Chess();
-    try {
-      g.load(fen);
-    } catch {
-      g.reset();
-      setFen(g.fen());
-    }
+    try { g.load(fen); } catch { }
     return g;
-  }, [fen, gamePly]);
+  }, [fen]);
 
-  function setStart() {
-    const g = new Chess();
-    setFen(g.fen());
-    setGamePly((n) => n + 1);
+  function handleReset() {
+    setFen("rnbqkbnr/pppppppp/8/8/8/4P3/PPPP1PPP/RNBQKBNR w KQkq - 0 1"); // Default start
     setResult(null);
     setHistory([]);
+    setError(null);
+    setIsSetupMode(false);
   }
 
-  async function analyzeMoveAndAdvance(move: Move) {
+
+  async function analyzeMove(move: Move) {
     setLoading(true);
     setError(null);
-    setResult(null);
     try {
-      const uci = move.from + move.to + (move.promotion ? move.promotion : "");
-
-      const res = await fetch("/api/analyze", {
+      const uci = move.from + move.to + (move.promotion || "");
+      const res = await fetch("http://127.0.0.1:8000/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fen, move: uci })
       });
+      
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.detail || `HTTP ${res.status}`);
       }
+      
       const data: AnalyzeResponse = await res.json();
       setResult(data);
-
-      // Advance game state and record SAN
-      const g = new Chess();
-      g.load(fen);
-      const made = g.move(move);
-      if (made) {
-        setFen(g.fen());
-        setGamePly((n) => n + 1);
-        setHistory((h) => h.concat(g.history({ verbose: false }).slice(-1)));
-      }
+      
+ 
+      const g = new Chess(fen);
+      g.move(move);
+      setFen(g.fen());
+      setHistory(prev => [...prev, g.history().pop()!]);
     } catch (e: any) {
-      setError(e.message || String(e));
+      setError(e.message);
     } finally {
       setLoading(false);
     }
   }
 
-  function onPieceDrop(sourceSquare: string, targetSquare: string) {
-    const legal = game.moves({ verbose: true }) as Move[];
-    let move = legal.find((m) => m.from === sourceSquare && m.to === targetSquare);
+
+
+  function onDrop(source: string, target: string) {
+
+    if (isSetupMode) {
+        const newFen = manualFenMove(fen, source, target);
+        setFen(newFen);
+        return true;
+    }
+
+    const moves = game.moves({ verbose: true }) as Move[];
+    let move = moves.find(m => m.from === source && m.to === target);
+
 
     if (!move) {
-      // auto-queen promotion attempt
-      const maybe = game.move({ from: sourceSquare, to: targetSquare, promotion: "q" as any });
-      if (maybe) {
-        game.undo();
-        move = { from: sourceSquare, to: targetSquare, promotion: "q" } as unknown as Move;
+      const promoMove = game.move({ from: source, to: target, promotion: 'q' });
+      if (promoMove) {
+        game.undo(); 
+        move = { from: source, to: target, promotion: 'q' } as Move;
       }
     }
 
-    if (!move) return false;
-
-    analyzeMoveAndAdvance(move);
-    return true;
+    if (move) {
+      analyzeMove(move);
+      return true;
+    }
+    return false;
   }
 
-  const engine = result?.details?.engine;
-  let evalBox: React.ReactNode = null;
-  if (engine?.enabled && engine.before?.ok && engine.after?.ok) {
-    const b = engine.before;
-    const a = engine.after;
-    const bStr = (b.score_centipawn !== null && b.score_centipawn !== undefined)
-      ? (b.score_centipawn/100).toFixed(2)
-      : (b.mate_in ? `#${b.mate_in}` : "n/a");
-    const aStr = (a.score_centipawn !== null && a.score_centipawn !== undefined)
-      ? (a.score_centipawn/100).toFixed(2)
-      : (a.mate_in ? `#${a.mate_in}` : "n/a");
-    let deltaStr = "n/a";
-    if (a.score_centipawn !== null && a.score_centipawn !== undefined &&
-        b.score_centipawn !== null && b.score_centipawn !== undefined) {
-      const delta = (a.score_centipawn - b.score_centipawn) / 100;
-      const sign = delta >= 0 ? "+" : "";
-      deltaStr = `${sign}${delta.toFixed(2)}`;
-    }
-    evalBox = (
-      <p><strong>Stockfish depth {engine.depth}:</strong> {bStr} → {aStr}, Δ {deltaStr}</p>
-    );
+
+  function onSquareClick(square: string) {
+    if (!isSetupMode || !selectedPiece) return;
+
+
+    const char = selectedPiece.color === 'w' 
+      ? selectedPiece.type.toUpperCase() 
+      : selectedPiece.type.toLowerCase();
+
+    const newFen = manualFenUpdate(fen, square, char);
+    setFen(newFen);
+  }
+
+
+  function onSquareRightClick(square: string) {
+    if (!isSetupMode) return;
+    const newFen = manualFenUpdate(fen, square, null); 
+    setFen(newFen);
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: "40px auto", fontFamily: "system-ui, Segoe UI, Roboto, Arial" }}>
+    <div className="container">
       <h1>Chess Move Reaction AI</h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 560px) 1fr", gap: 24 }}>
+      <div className="grid-layout">
+        {/* Board */}
         <div>
-          <Chessboard
-            position={fen}
-            onPieceDrop={onPieceDrop}
+          {isSetupMode && (
+            <div className="setup-tools">
+              <div className="instruction-text">
+                Select a piece below and <strong>Left-Click</strong> board to place.<br/>
+                <strong>Right-Click</strong> any square to remove a piece.
+              </div>
+              <div className="piece-palette">
+                {PIECES.map((p) => (
+                  <div
+                    key={p.color + p.type}
+                    className={`palette-piece ${selectedPiece?.type === p.type && selectedPiece?.color === p.color ? 'selected' : ''}`}
+                    onClick={() => setSelectedPiece({type: p.type, color: p.color})}
+                  >
+                    {p.symbol}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Chessboard 
+            position={fen} 
+            onPieceDrop={onDrop}
+            onSquareClick={onSquareClick}
+            onSquareRightClick={onSquareRightClick}
             boardWidth={560}
             arePiecesDraggable={!loading}
+            animationDuration={200}
+            customDarkSquareStyle={{ backgroundColor: "#779954" }}
+            customLightSquareStyle={{ backgroundColor: "#e9edcc" }}
           />
-          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={setStart} disabled={loading}>Reset</button>
-            <small style={{ opacity: 0.7 }}>FEN:</small>
-            <input
-              value={fen}
-              onChange={(e) => setFen(e.target.value)}
-              style={{ flex: 1, minWidth: 0, fontFamily: "monospace", padding: 6 }}
-            />
-          </div>
-          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-            Tip: Drag a piece to make a move. Promotions auto-queen for now.
+
+          <div className="controls">
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 10}}>
+              <div style={{display:'flex', gap: 10}}>
+                <button className="btn secondary" onClick={handleReset}>Reset Board</button>
+                <button 
+                  className={`btn ${isSetupMode ? "secondary" : ""}`}
+                  onClick={() => setIsSetupMode(!isSetupMode)}
+                >
+                  {isSetupMode ? "Done Setup" : "Setup Board"}
+                </button>
+              </div>
+              {isSetupMode && (
+                <button className="btn secondary" onClick={() => setFen("8/8/8/8/8/8/8/8 w - - 0 1")}>
+                  Clear Board
+                </button>
+              )}
+            </div>
+
+            <div className="fen-input-group">
+              <span style={{color: '#888', fontSize: '0.9rem'}}>FEN:</span>
+              <input 
+                className={`fen-input ${!isValidFen ? 'invalid' : ''}`}
+                value={fen}
+                onChange={(e) => setFen(e.target.value)}
+              />
+            </div>
+            {!isValidFen && <small style={{color: 'var(--danger-color)'}}>Invalid FEN Position (Game Logic Disabled)</small>}
           </div>
         </div>
 
-        <div>
-          <h3>Analysis</h3>
-          {loading && <p>Analyzing…</p>}
-          {error && <p style={{ color: "#b00020" }}><strong>Error:</strong> {error}</p>}
-          {result && (
-            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16 }}>
-              <p><strong>Move:</strong> {result.normalized_move}</p>
-              <p><strong>Reaction:</strong> {result.reaction}</p>
-              {evalBox}
-              <details>
-                <summary>Details</summary>
-                <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(result.details, null, 2)}</pre>
-              </details>
+        {/* Analysis */}
+        <div className="analysis-panel">
+          {error && (
+            <div className="card" style={{borderLeft: '4px solid var(--danger-color)'}}>
+              <strong>Error:</strong> {error}
             </div>
           )}
-          {history.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <h4>Moves</h4>
-              <p>
-                {history.map((m, i) =>
-                  i % 2 === 0 ? `${Math.floor(i / 2) + 1}. ${m}` : m
-                ).join(" ")}
-              </p>
+          
+          {loading && <div className="card">Analyzing move...</div>}
+
+          {!loading && result && (
+            <div className="card">
+              <div className="reaction-box">
+                <p className="reaction-text">{result.reaction}</p>
+                <small style={{color: '#888'}}>{result.normalized_move}</small>
+              </div>
+
+              {result.details?.engine?.enabled && result.details.engine_summary?.available && (
+                <div className="eval-bar">
+                  <span>
+                    Eval: <strong>{result.details.engine_summary.after_cp / 100}</strong>
+                  </span>
+                  <span>
+                    Delta: <strong style={{
+                      color: result.details.engine_summary.delta_cp > 0 ? 'var(--success-color)' : 'var(--danger-color)'
+                    }}>
+                      {result.details.engine_summary.delta_cp > 0 ? "+" : ""}
+                      {result.details.engine_summary.delta_cp / 100}
+                    </strong>
+                  </span>
+                </div>
+              )}
+              
+              <div style={{marginTop: 20}}>
+                <details>
+                  <summary className="details-summary">View Raw Details</summary>
+                  <pre style={{fontSize: '0.8rem', color: '#888', overflowX: 'auto'}}>
+                    {JSON.stringify(result.details, null, 2)}
+                  </pre>
+                </details>
+              </div>
             </div>
           )}
+
+          <div className="card">
+            <h3 style={{marginTop: 0, fontSize: '1rem'}}>Move History</h3>
+            <div className="history-list">
+              {history.length === 0 ? "No moves yet." : history.map((m, i) => (
+                <span key={i} style={{marginRight: 10}}>
+                  {i % 2 === 0 ? `${Math.floor(i/2) + 1}.` : ""} <span style={{color: 'white'}}>{m}</span>
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

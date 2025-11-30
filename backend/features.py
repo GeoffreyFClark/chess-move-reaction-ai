@@ -238,6 +238,18 @@ def extract_features_before_after(fen: str, move: chess.Move) -> dict:
     # Execute the move
     board.push(move)
 
+    opponent_can_mate = False
+    if not board.is_game_over():
+        for response in board.legal_moves:
+            board.push(response)
+            if board.is_checkmate():
+                opponent_can_mate = True
+                board.pop()
+                break
+            board.pop()
+            
+    features["opponent_mate_threat"] = opponent_can_mate
+
     # After-move info
     features["in_check_after"] = board.is_check()
     features["gives_check_after"] = board.is_check()
