@@ -110,6 +110,50 @@ def add_reason(reasons: list[str], text: str):
     if text and text not in reasons:
         reasons.append(text)
 
+def format_ud_pieces(ud_material, type, moved_piece_undefended = False, void_sq = None):
+    """Format underdefended material output to condense the feedback."""
+    sqs = []
+    pieces = []
+    for sq, piece in ud_material:
+        if (moved_piece_undefended and not sq == void_sq) or not moved_piece_undefended:
+            # Ignore if moved piece is undefended (handled by undefended heuristic).
+            sqs.append(sq)
+            pieces.append(piece)
+
+    if type == 1: # ud_material_from_mover_no_longer
+        if len(pieces) == 1:
+            # Your | [piece] at [sq] [IS] | no longer underdefended.
+            return f"{describe_piece(pieces[0])} at {sqs[0]} is"
+        if len(pieces) == 2:
+            # Your | [piece] at [sq] and [piece] at [sq] [ARE] | no longer underdefended.
+            return f"{describe_piece(pieces[0])} at {sqs[0]} and {describe_piece(pieces[1])} at {sqs[1]} are"
+        if len(pieces) >= 3:
+            # Your | [piece] at [sq], [piece] at [sq], and [piece] at [sq] [ARE] | no longer underdefended.
+            pieces_text = ""
+            for i in range(len(pieces)):
+                if i < len(pieces) - 1:
+                    pieces_text += f"{describe_piece(pieces[i])} at {sqs[i]}, "
+                else:
+                    pieces_text += f"and {describe_piece(pieces[i])} at {sqs[i]} are"
+            return pieces_text
+
+    if type == 2: # ud_material_from_mover, ud_material_from_nonmover
+        if len(pieces) == 1:
+            # You have an underdefended | [piece] at [sq] | .
+            return f"{describe_piece(pieces[0])} at {sqs[0]}"
+        if len(pieces) == 2:
+            # You have an underdefended | [piece] at [sq] and [piece] at [sq] | .
+            return f"{describe_piece(pieces[0])} at {sqs[0]} and {describe_piece(pieces[1])} at {sqs[1]}"
+        if len(pieces) >= 3:
+            # You have an underdefended | [piece] at [sq], [piece] at [sq], and [piece] at [sq] | .
+            pieces_text = ""
+            for i in range(len(pieces)):
+                if i < len(pieces) - 1:
+                    pieces_text += f"{describe_piece(pieces[i])} at {sqs[i]}, "
+                else:
+                    pieces_text += f"and {describe_piece(pieces[i])} at {sqs[i]}"
+            return pieces_text
+
 def summarize_engine(engine: dict | None, mover: str) -> dict:
     summary = {
         "available": False,
@@ -222,14 +266,17 @@ def explain_move(fen: str, move_str: str) -> dict:
         eval_before = material_balance_before
         eval_after = material_balance_after
     eval_delta = eval_after - eval_before
-    eval_drop = abs(eval_delta) >= 0.25
-
+    # eval_drop = abs(eval_delta) >= 0.25
+    eval_drop = eval_delta <= -0.25
+    values = {chess.PAWN:1, chess.KNIGHT:3, chess.BISHOP:3, chess.ROOK:5, chess.QUEEN:9, chess.KING:999}
     capture_destination = chess.square_name(move.to_square)
     opponent_moves_after = list(board_after.legal_moves)
     immediate_recapture_possible = feats["is_capture"] and any(
         m.to_square == move.to_square and board_after.is_capture(m)
         for m in opponent_moves_after
     )
+    cur_piece_val = values[(moving_piece).piece_type]
+    good_exchange = (material_balance_after - material_balance_before) > cur_piece_val
     capturing_piece_loose = feats["is_capture"] and any(
         sq == capture_destination for sq, _ in ud_material_from_mover
     )
@@ -246,6 +293,7 @@ def explain_move(fen: str, move_str: str) -> dict:
     else:
         key = "game_continues"
         reasons: list[str] = []
+        win_material_dupe = False
 
         if feats["is_capture"]:
             winning_cleanly = (
@@ -255,10 +303,16 @@ def explain_move(fen: str, move_str: str) -> dict:
             )
             if winning_cleanly:
                 add_reason(reasons, "You win material outright.")
+                win_material_dupe = True
             elif engine_eval_ready and material_delta_from_mover <= 0 and not eval_drop:
                 add_reason(reasons, "Engine expects the initiative to justify the capture.")
             if immediate_recapture_possible:
-                add_reason(reasons, "Expect an immediate recapture that cancels the gain.")
+                if good_exchange and not win_material_dupe:
+                    add_reason(reasons, "Expect an immediate recapture, but positive exchange overall.")
+                elif good_exchange:
+                    add_reason(reasons, "Expect an immediate recapture.")
+                else:
+                    add_reason(reasons, "Expect an immediate recapture that cancels the gain.")
             if not immediate_recapture_possible and capturing_piece_loose:
                 add_reason(reasons, "The capturing piece may be chased away.")
 
@@ -291,7 +345,8 @@ def explain_move(fen: str, move_str: str) -> dict:
         if feats["is_promotion"]:
             add_reason(reasons, "Promotion increases your material!")
         if material_delta_from_mover >= 2:
-            add_reason(reasons, "You win material.")
+            if not win_material_dupe and not immediate_recapture_possible:
+                add_reason(reasons, "You took material.") # "win" material changed to "took" material to generalize scenarios that don't win an exchange
         elif material_delta_from_mover <= -2:
             add_reason(reasons, "Material losses.")
         elif material_delta_from_mover == -1:
@@ -317,12 +372,21 @@ def explain_move(fen: str, move_str: str) -> dict:
             else:
                 add_reason(reasons, "It may loosen king safety.")
 
-        for sq, piece in ud_material_from_mover_no_longer:
-            add_reason(reasons, f"Your {describe_piece(piece)} at {sq} is no longer underdefended.")
-        for sq, piece in ud_material_from_mover:
-            add_reason(reasons, f"You have an underdefended {describe_piece(piece)} at {sq}.")
-        for sq, piece in ud_material_from_nonmover:
-            add_reason(reasons, f"Your opponent has an underdefended {describe_piece(piece)} at {sq}.")
+        if ud_material_from_mover_no_longer:
+            moved_piece_undefended, moved_piece_after = piece_undefended(board_after, move.to_square, mover_color)
+            piece_text = format_ud_pieces(ud_material_from_mover_no_longer, 1, moved_piece_undefended, capture_destination)
+            full_text = f"Your {piece_text} no longer underdefended."
+            if piece_text:
+                add_reason(reasons, full_text)
+        if ud_material_from_mover:
+            moved_piece_undefended, moved_piece_after = piece_undefended(board_after, move.to_square, mover_color)
+            piece_text = format_ud_pieces(ud_material_from_mover, 2, moved_piece_undefended, capture_destination)
+            full_text = f"You have an underdefended {piece_text}."
+            if piece_text:
+                add_reason(reasons, full_text)
+        if ud_material_from_nonmover:
+            full_text = f"Your opponent has an underdefended {format_ud_pieces(ud_material_from_nonmover, 2)}."
+            add_reason(reasons, full_text)
 
         castling_lost = feats["castling_rights_lost"]
         mover_lost_k = castling_lost.get(f"{mover_key}_can_castle_k_lost")
@@ -410,7 +474,8 @@ def explain_move(fen: str, move_str: str) -> dict:
 
         moved_piece_undefended, moved_piece_after = piece_undefended(board_after, move.to_square, mover_color)
         if moved_piece_undefended and moved_piece_after:
-            add_reason(reasons, f"Your {describe_piece(moved_piece_after)} at {capture_destination} is undefended.")
+            if not immediate_recapture_possible: # Redundant if intended to be exchanged.
+                add_reason(reasons, f"Your {describe_piece(moved_piece_after)} at {capture_destination} is undefended.")
 
         # Trading check
         if feats["is_capture"] or (feats["material_delta"] == 0 and feats["is_capture"]):

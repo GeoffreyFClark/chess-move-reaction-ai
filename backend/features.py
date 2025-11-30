@@ -109,12 +109,10 @@ def ud_material(board):
     """Return the underdefended pieces for each side using python-chess board.attackers().
     Returns a dict like {"white": [(sq, piece), ...], "black": [(sq, piece), ...]}.
     """
-    # BUG: Assumes order of exchange is from least to most valuable pieces, which ignores cases where
-    # certain pieces MUST be exchanged before others (eg. rook behind a queen).
-    # BUG: board.attackers can't detect attackers that are behind other attackers
-    # (eg. bishop behind pawn taking diagonally)
-    # BUG: Ignores pinned pieces which cannot be moved, as well as partial pins.
-    # BUG: Ignoring overwhelming complexity from considering board after each exchange possibility.
+    # Order of exchange is from least to most valuable pieces, ignores cases where
+    # certain pieces must be exchanged before others (eg. rook behind a queen).
+    # Method board.attackers can't detect attackers that are behind other attackers
+    # Ignores pinned pieces which cannot be moved, as well as partial pins.
     underdefended_pieces = {"white": [], "black": []}
     values = {chess.PAWN:1, chess.KNIGHT:3, chess.BISHOP:3, chess.ROOK:5, chess.QUEEN:9, chess.KING:999}
     for sq, piece in board.piece_map().items():
@@ -123,7 +121,7 @@ def ud_material(board):
             attackers = board.attackers(not piece.color, sq)
             defenders = board.attackers(piece.color, sq)
 
-            if attackers: # TODO: Consider differentiating loose, hanging, and loosely defended pieces.
+            if attackers:
                 if piece.color == chess.WHITE:
                     color = "white"
                 else:
