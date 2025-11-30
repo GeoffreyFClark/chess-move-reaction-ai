@@ -4,7 +4,7 @@ Chess engines give raw scores and best lines, but not explanations, reasons, or 
 ## Prereqs
 - Node.js
 - Python 3
-- Optional: Stockfish 17.1 binary (Included in this repository's backend)
+- Optional but increases reaction precision: Chess Engine (Stockfish 17.1 for Windows x64 included in this repo's backend as `stockfish.exe`. Replace if using alternate OS https://stockfishchess.org/download/)
 
 ## Run Python venv and install requirements
 ```bash
@@ -20,13 +20,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## CLI usage (no server required)
-```bash
-# i.e. Starting position and move 1. e4
-python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" --move "e4"
-```
-
-## Run backend
+## Run backend 
 ```bash
 uvicorn app:app --reload --port 8000
 ```
@@ -36,6 +30,15 @@ uvicorn app:app --reload --port 8000
 cd frontend
 npm install
 npm run dev
+```
+
+## Screenshot:
+![sample_screenshot](sample_screenshot.png)
+
+## CLI usage (no server required)
+```bash
+# i.e. Starting position and move 1. e4
+python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" --move "e4"
 ```
 
 ## Notes

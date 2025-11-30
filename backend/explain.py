@@ -258,7 +258,7 @@ def explain_move(fen: str, move_str: str) -> dict:
             elif engine_eval_ready and material_delta_from_mover <= 0 and not eval_drop:
                 add_reason(reasons, "Engine expects the initiative to justify the capture.")
             if immediate_recapture_possible:
-                add_reason(reasons, "Expect an immediate recapture that cancels the gain.")
+                add_reason(reasons, "An immediate recapture is possible.")
             if not immediate_recapture_possible and capturing_piece_loose:
                 add_reason(reasons, "The capturing piece may be chased away.")
 
@@ -291,11 +291,11 @@ def explain_move(fen: str, move_str: str) -> dict:
         if feats["is_promotion"]:
             add_reason(reasons, "Promotion increases your material!")
         if material_delta_from_mover >= 2:
-            add_reason(reasons, "You win material.")
+            add_reason(reasons, "You win material with this move.")
         elif material_delta_from_mover <= -2:
-            add_reason(reasons, "Material losses.")
+            add_reason(reasons, "Material losses with this move.")
         elif material_delta_from_mover == -1:
-            add_reason(reasons, "Slight material loss.")
+            add_reason(reasons, "Slight material loss with this move.")
 
         mover_color = chess.WHITE if mover == "White" else chess.BLACK
         king_files_nearby = king_zone_files(board.king(mover_color)) | king_zone_files(board_after.king(mover_color))
@@ -311,9 +311,9 @@ def explain_move(fen: str, move_str: str) -> dict:
         if king_safety_concern and (king_move or pawn_near_king):
             num_dangerous_squares = len(feats["king_exposed"])
             if num_dangerous_squares >= 3:
-                add_reason(reasons, "This significantly worsens king safety - multiple escape squares become more dangerous.")
+                add_reason(reasons, "Safe squares for the King to move to have decreased.")
             elif num_dangerous_squares >= 1:
-                add_reason(reasons, "It may loosen king safety - some escape squares become more perilous.")
+                add_reason(reasons, "King escape squares have been reduced.")
             else:
                 add_reason(reasons, "It may loosen king safety.")
 
@@ -356,7 +356,7 @@ def explain_move(fen: str, move_str: str) -> dict:
                 add_reason(reasons, "Queenside castling is now off the table for you.")
 
         if opponent_lost_k:
-            add_reason(reasons, "The opponent can no longer castle kinside.")
+            add_reason(reasons, "The opponent can no longer castle kingside.")
         if opponent_lost_q:
             add_reason(reasons, "The opponent can no longer castle queenside.")
 
