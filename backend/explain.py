@@ -237,6 +237,9 @@ def explain_move(fen: str, move_str: str) -> dict:
     if feats.get("is_checkmate_after"):
         key = "mate_for"
         reasons = ["The move delivers checkmate."]
+    elif feats.get("opponent_mate_threat"):
+        key = "mate_against"
+        reasons = ["This move allows the opponent to deliver checkmate immediately."]
     elif feats.get("is_stalemate_after"):
         key = "stalemate"
         reasons = ["The side to move has no legal moves and is not in check."]
@@ -440,7 +443,12 @@ def explain_move(fen: str, move_str: str) -> dict:
             add_reason(reasons, "Moving the same piece twice in the opening costs time (tempo).")
 
         # Blunders
-        if feats.get("is_hanging_to_lesser"):
+        if feats.get("opponent_mate_threat"):
+            key = "mate_against" 
+
+            add_reason(reasons, "This move allows the opponent to deliver checkmate immediately.")
+
+        elif feats.get("is_hanging_to_lesser"):
             key = "blunderish"
           
             add_reason(reasons, "You moved a valuable piece to a square attacked by a pawn or minor piece!")
