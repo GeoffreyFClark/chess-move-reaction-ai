@@ -5,7 +5,7 @@ The aim of our project is to create an early version of a Chess Move Reaction AI
 ## Prereqs
 - Node.js
 - Python 3
-- Optional but increases reaction precision: Chess Engine (Stockfish 17.1 for Windows x64 included in this repo's backend as `stockfish.exe`. Replace if using alternate OS https://stockfishchess.org/download/)
+- Recommended to increase reaction precision: Chess Engine (Stockfish 17.1 for Windows x64 included in this repo's backend as `stockfish.exe`. Replace accordingly if using different OS https://stockfishchess.org/download/)
 
 ## Run Python venv and install requirements
 ```bash
@@ -37,10 +37,12 @@ npm run dev
 ![sample_screenshot](sample_screenshot.png)
 
 ## CLI usage (no server required)
+
 ```bash
 # i.e. Starting position and move 1. e4
 python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" --move "e4"
 ```
+You can replace the FEN and move with any legal position and move to test different reactions in the CLI.
 
 ## Notes
 - v1 uses heuristics, first order logic, and propositional logic based on features extracted via `python-chess`
@@ -48,5 +50,3 @@ python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" -
 - API: `POST /api/analyze` with `{ "fen": "...", "move": "Nf3|g1f3" }` returns `{ ok, normalized_move, reaction, details }`.
 - Can be used via CLI or via `react-chessboard` + `chess.js` frontend for drag-and-drop moves.
 - We accept both SAN (i.e. Nf3 -- human preferred) and UCI (fixed coordinate form i.e. g1f3 -- used by python-chess, engines, etc), store/log moves internally as UCI for consistency, and display explanations in SAN for readability.
-
-## Future 
