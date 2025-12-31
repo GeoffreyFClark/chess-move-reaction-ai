@@ -2,6 +2,31 @@ import chess
 
 from chess import PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
 
+
+def validate_fen(fen: str) -> tuple[bool, str | None]:
+    """Validate a FEN string for correctness.
+
+    Checks that the FEN is parseable by python-chess and that both kings
+    are present on the board.
+
+    Args:
+        fen: The FEN string to validate.
+
+    Returns:
+        A tuple of (is_valid, error_message). If valid, error_message is None.
+    """
+    try:
+        board = chess.Board(fen)
+    except ValueError as e:
+        return False, f"Invalid FEN format: {e}"
+
+    if board.king(chess.WHITE) is None:
+        return False, "Invalid position: White king is missing"
+    if board.king(chess.BLACK) is None:
+        return False, "Invalid position: Black king is missing"
+
+    return True, None
+
 ROOK_HOME_SQUARES = {
     chess.WHITE: {"k": chess.H1, "q": chess.A1},
     chess.BLACK: {"k": chess.H8, "q": chess.A8},
