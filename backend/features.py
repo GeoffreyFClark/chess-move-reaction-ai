@@ -46,20 +46,34 @@ def material_score(board: chess.Board) -> int:
         score -= len(board.pieces(piece_type, chess.BLACK)) * val
     return score
 
-def king_exposed_heuristic(board: chess.Board, side: bool) -> bool:
-    """Very rough: count squares attacked around the king. If 4 or more attacks, consider king exposed."""
+def king_exposed_heuristic(board: chess.Board, side: bool) -> dict[int, int]:
+    """Analyze king safety by evaluating escape square danger.
+
+    For each unattacked neighboring square around the king, calculates how much
+    more dangerous that square would be if the king moved there. A higher value
+    indicates the king's escape routes are becoming more restricted.
+
+    Args:
+        board: The chess board position to analyze.
+        side: The color of the king to evaluate (chess.WHITE or chess.BLACK).
+
+    Returns:
+        A dict mapping square indices to their increased danger level.
+        Empty dict means the king has safe escape squares.
+        Example: {chess.E2: 2, chess.F2: 1} means moving to e2 would expose
+        the king to 2 more attacks than the current position.
+    """
     king_sq = board.king(side)
     if king_sq is None:
-        return False
-    
+        return {}
+
     neighbors = [sq for sq in chess.SQUARES if chess.square_distance(sq, king_sq) == 1]
-    attacks = sum(1 for sq in neighbors if board.is_attacked_by(not side, sq)) # Attack count for current neighboring squares
+    attacks = sum(1 for sq in neighbors if board.is_attacked_by(not side, sq))
     unattacked = (sq for sq in neighbors if not board.is_attacked_by(not side, sq))
 
-    # Extend the king safety heuristic by including whether the king's escape squares shrink.
-    # Idea: For every unattacked neighboring square, calculate attack score, if the attack score is greater it means moving to that square is more dangerous. Store this info in a dictionary.
-
-    attack_dict = {}
+    # For every unattacked neighboring square, calculate attack score.
+    # If the attack score is greater, moving to that square is more dangerous.
+    attack_dict: dict[int, int] = {}
 
     for neighbor_sq in unattacked:
         sq_to_check = neighbor_sq
@@ -67,8 +81,8 @@ def king_exposed_heuristic(board: chess.Board, side: bool) -> bool:
         board_copy.remove_piece_at(king_sq)
         board_copy.set_piece_at(sq_to_check, chess.Piece(chess.KING, side))
 
-        neighbors = [sq for sq in chess.SQUARES if chess.square_distance(sq, sq_to_check) == 1]
-        neighbor_attacks = sum(1 for sq in neighbors if board_copy.is_attacked_by(not side, sq)) # Attack count for unattacked neighbor's neighboring squares
+        new_neighbors = [sq for sq in chess.SQUARES if chess.square_distance(sq, sq_to_check) == 1]
+        neighbor_attacks = sum(1 for sq in new_neighbors if board_copy.is_attacked_by(not side, sq))
         if neighbor_attacks > attacks:
             attack_dict[sq_to_check] = neighbor_attacks - attacks
 
