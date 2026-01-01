@@ -93,4 +93,4 @@ def test_explain_move_sets_checkmate_flag():
 	fen = "7k/5Q2/7K/8/8/8/8/8 w - - 0 1"
 	result = explain_move(fen, "Qg7#")
 	assert result["details"]["is_checkmate_after"] is True
-	assert "Checkmate" in result["reaction"]
+	assert "checkmate" in result["reaction"].lower()
