@@ -1,4 +1,5 @@
 """Engine evaluation summary utilities."""
+
 from typing import TypedDict
 
 from .templates import ENGINE_TONE_THRESHOLDS

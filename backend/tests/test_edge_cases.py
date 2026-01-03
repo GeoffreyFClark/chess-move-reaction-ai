@@ -1,6 +1,8 @@
 """Tests for edge cases in move analysis."""
+
 import os
 import sys
+
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -47,7 +49,10 @@ class TestCastling:
     def test_kingside_castling(self):
         fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1"
         result = explain_move(fen, "O-O")
-        assert "castle" in result["reaction"].lower() or result["details"]["castling_rights_lost"]["white_can_castle_k_lost"]
+        assert (
+            "castle" in result["reaction"].lower()
+            or result["details"]["castling_rights_lost"]["white_can_castle_k_lost"]
+        )
 
     def test_queenside_castling(self):
         fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1"

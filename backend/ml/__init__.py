@@ -3,8 +3,9 @@
 This module provides ML-based move quality prediction as a complement
 to the rule-based analysis in the explain module.
 """
-from .predictor import MoveQualityPredictor, predict_move_quality
+
 from .feature_engineering import extract_ml_features
+from .predictor import MoveQualityPredictor, predict_move_quality
 
 __all__ = [
     "MoveQualityPredictor",

@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from schemas import AnalyzeRequest, AnalyzeResponse
+
 from explain import explain_move
+from schemas import AnalyzeRequest, AnalyzeResponse
 from settings import settings
 
 app = FastAPI(title="Chess Move Reaction AI", version="0.2.0")
@@ -14,9 +15,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True}
+
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 def api_analyze(req: AnalyzeRequest):
@@ -29,4 +32,4 @@ def api_analyze(req: AnalyzeRequest):
             details=out["details"],
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e

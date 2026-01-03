@@ -1,4 +1,5 @@
 """Utility functions for move explanation."""
+
 import chess
 
 

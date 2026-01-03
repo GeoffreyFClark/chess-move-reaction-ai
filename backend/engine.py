@@ -3,7 +3,6 @@ import re
 import shutil
 import subprocess
 import time
-from typing import Optional
 
 import chess
 
@@ -20,7 +19,9 @@ def is_configured() -> bool:
     if not settings.stockfish_path:
         return False
     # Check if path exists directly or is in system PATH
-    return os.path.isfile(settings.stockfish_path) or shutil.which(settings.stockfish_path) is not None
+    return (
+        os.path.isfile(settings.stockfish_path) or shutil.which(settings.stockfish_path) is not None
+    )
 
 
 def _uci_eval(fen: str, depth: int, timeout: float = DEFAULT_TIMEOUT) -> dict:
@@ -44,7 +45,7 @@ def _uci_eval(fen: str, depth: int, timeout: float = DEFAULT_TIMEOUT) -> dict:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
         )
     except Exception as e:
         return {"ok": False, "note": f"Unable to start Stockfish: {e}"}
@@ -130,15 +131,16 @@ def _uci_eval(fen: str, depth: int, timeout: float = DEFAULT_TIMEOUT) -> dict:
     if mate_in is not None:
         mate_in *= sign
 
-    return {"ok": True, "score_centipawn": score_centipawn, "mate_in": mate_in, "bestmove": bestmove}
+    return {
+        "ok": True,
+        "score_centipawn": score_centipawn,
+        "mate_in": mate_in,
+        "bestmove": bestmove,
+    }
 
-def analyze_with_stockfish_before_after(fen: str, fen_after: str, depth: Optional[int] = None) -> dict:
+
+def analyze_with_stockfish_before_after(fen: str, fen_after: str, depth: int | None = None) -> dict:
     d = depth or settings.stockfish_depth
     before = _uci_eval(fen, d)
-    after  = _uci_eval(fen_after, d)
-    return {
-        "enabled": True,
-        "depth": d,
-        "before": before,
-        "after": after
-    }
+    after = _uci_eval(fen_after, d)
+    return {"enabled": True, "depth": d, "before": before, "after": after}

@@ -1,5 +1,7 @@
 import argparse
-from explain import explain_move
+
+from explain import explain_move  # noqa: I001
+
 
 def main():
     p = argparse.ArgumentParser(description="Chess Move Reaction AI (CLI)")
@@ -17,10 +19,15 @@ def main():
             before = v.get("before", {})
             after = v.get("after", {})
             print(f"    - depth: {v.get('depth')}")
-            print(f"    - before: centipawn={before.get('score_centipawn')} mate={before.get('mate_in')} best={before.get('bestmove')}")
-            print(f"    - after:  centipawn={after.get('score_centipawn')} mate={after.get('mate_in')} best={after.get('bestmove')}")
+            print(
+                f"    - before: centipawn={before.get('score_centipawn')} mate={before.get('mate_in')} best={before.get('bestmove')}"
+            )
+            print(
+                f"    - after:  centipawn={after.get('score_centipawn')} mate={after.get('mate_in')} best={after.get('bestmove')}"
+            )
         else:
             print(f"  - {k}: {v}")
+
 
 if __name__ == "__main__":
     main()

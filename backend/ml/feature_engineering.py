@@ -3,8 +3,10 @@
 Extracts numerical features from chess positions and moves
 for use in machine learning models.
 """
-import chess
+
 from typing import TypedDict
+
+import chess
 
 
 class PositionFeatures(TypedDict):
@@ -68,12 +70,10 @@ def extract_ml_features(board: chess.Board, move: chess.Move) -> list[float]:
 
     # Material balance (1 feature)
     white_material = sum(
-        len(board.pieces(pt, chess.WHITE)) * val
-        for pt, val in PIECE_VALUES.items()
+        len(board.pieces(pt, chess.WHITE)) * val for pt, val in PIECE_VALUES.items()
     )
     black_material = sum(
-        len(board.pieces(pt, chess.BLACK)) * val
-        for pt, val in PIECE_VALUES.items()
+        len(board.pieces(pt, chess.BLACK)) * val for pt, val in PIECE_VALUES.items()
     )
     features.append(float(white_material - black_material))
 
@@ -108,7 +108,9 @@ def extract_ml_features(board: chess.Board, move: chess.Move) -> list[float]:
     features.append(float(PIECE_VALUES.get(moving_piece.piece_type, 0)) if moving_piece else 0.0)
 
     captured_piece = board.piece_at(move.to_square)
-    features.append(float(PIECE_VALUES.get(captured_piece.piece_type, 0)) if captured_piece else 0.0)
+    features.append(
+        float(PIECE_VALUES.get(captured_piece.piece_type, 0)) if captured_piece else 0.0
+    )
 
     # Is the destination square attacked by opponent?
     features.append(1.0 if board.is_attacked_by(not board.turn, move.to_square) else 0.0)
@@ -123,13 +125,26 @@ def get_feature_names() -> list[str]:
         List of feature name strings.
     """
     return [
-        "white_pawns", "white_knights", "white_bishops", "white_rooks", "white_queens",
-        "black_pawns", "black_knights", "black_bishops", "black_rooks", "black_queens",
+        "white_pawns",
+        "white_knights",
+        "white_bishops",
+        "white_rooks",
+        "white_queens",
+        "black_pawns",
+        "black_knights",
+        "black_bishops",
+        "black_rooks",
+        "black_queens",
         "material_balance",
-        "center_control_white", "center_control_black",
-        "mobility_white", "mobility_black",
+        "center_control_white",
+        "center_control_black",
+        "mobility_white",
+        "mobility_black",
         "game_phase",
-        "is_capture", "is_check", "is_promotion",
-        "piece_value_moved", "piece_value_captured",
+        "is_capture",
+        "is_check",
+        "is_promotion",
+        "piece_value_moved",
+        "piece_value_captured",
         "to_square_attacked",
     ]

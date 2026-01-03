@@ -1,27 +1,29 @@
 """Tests for the features module."""
+
 import os
 import sys
-import pytest
+
 import chess
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from features import (
-    validate_fen,
-    material_score,
-    king_exposed_heuristic,
-    count_pins,
-    get_castling_rights,
+    analyze_pawn_structure,
     castling_rights_lost,
-    get_mobility_scores,
-    get_center_control_scores,
+    count_pins,
     detect_doubled_pawns,
     detect_isolated_pawns,
     detect_passed_pawns,
-    analyze_pawn_structure,
+    get_castling_rights,
+    get_center_control_scores,
+    get_mobility_scores,
     is_hanging_to_lesser_piece,
+    king_exposed_heuristic,
+    material_score,
     parse_move,
     piece_undefended,
+    validate_fen,
 )
 
 
@@ -34,7 +36,9 @@ class TestValidateFen:
         assert error is None
 
     def test_valid_mid_game_position(self):
-        valid, error = validate_fen("r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4")
+        valid, error = validate_fen(
+            "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4"
+        )
         assert valid is True
         assert error is None
 

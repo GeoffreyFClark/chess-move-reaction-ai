@@ -4,6 +4,7 @@ This module provides move quality prediction that complements the
 rule-based analysis. It can use either a trained ML model (if available)
 or fall back to a heuristic-based prediction.
 """
+
 import logging
 from pathlib import Path
 from typing import TypedDict
@@ -57,6 +58,7 @@ class MoveQualityPredictor:
         if self._model_path.exists():
             try:
                 import joblib
+
                 self._model = joblib.load(self._model_path)
                 self._model_loaded = True
                 logger.info(f"Loaded ML model from {self._model_path}")
@@ -105,6 +107,7 @@ class MoveQualityPredictor:
 
         try:
             import numpy as np
+
             features_array = np.array(features).reshape(1, -1)
             proba = self._model.predict_proba(features_array)[0]
             predicted_idx = np.argmax(proba)
@@ -112,7 +115,7 @@ class MoveQualityPredictor:
             return {
                 "prediction": QUALITY_LABELS[predicted_idx],
                 "confidence": float(proba[predicted_idx]),
-                "probabilities": {label: float(p) for label, p in zip(QUALITY_LABELS, proba)},
+                "probabilities": dict(zip(QUALITY_LABELS, [float(p) for p in proba], strict=False)),
                 "method": "ml",
             }
         except Exception as e:
@@ -170,7 +173,7 @@ class MoveQualityPredictor:
             prediction = "blunder"
 
         # Create probability distribution centered on prediction
-        proba = {label: 0.1 for label in QUALITY_LABELS}
+        proba = dict.fromkeys(QUALITY_LABELS, 0.1)
         proba[prediction] = 0.6
 
         return {

@@ -1,18 +1,19 @@
 """Core move explanation logic."""
+
 import chess
 
+from engine import analyze_with_stockfish_before_after, is_configured
 from features import (
+    ROOK_HOME_SQUARES,
     extract_features_before_after,
     king_zone_files,
-    ROOK_HOME_SQUARES,
     piece_undefended,
     validate_fen,
 )
-from engine import analyze_with_stockfish_before_after, is_configured
 
-from .templates import pick_line, pick_engine_line
 from .engine_summary import summarize_engine
 from .reason_builder import ReasonBuilder
+from .templates import pick_engine_line, pick_line
 from .utils import describe_piece
 
 
@@ -60,9 +61,15 @@ def explain_move(fen: str, move_str: str) -> dict:
     mover_color = chess.WHITE if mover == "White" else chess.BLACK
 
     # Calculate material perspectives
-    material_delta_from_mover = feats["material_delta"] if mover == "White" else -feats["material_delta"]
-    material_balance_before = feats["material_before"] if mover == "White" else -feats["material_before"]
-    material_balance_after = feats["material_after"] if mover == "White" else -feats["material_after"]
+    material_delta_from_mover = (
+        feats["material_delta"] if mover == "White" else -feats["material_delta"]
+    )
+    material_balance_before = (
+        feats["material_before"] if mover == "White" else -feats["material_before"]
+    )
+    material_balance_after = (
+        feats["material_after"] if mover == "White" else -feats["material_after"]
+    )
 
     # Underdefended material analysis
     ud_material_from_mover_before = feats["ud_material_before"][mover_key]
@@ -89,7 +96,9 @@ def explain_move(fen: str, move_str: str) -> dict:
     engine_summary = summarize_engine(engine_result, mover)
 
     # Determine evaluation basis
-    engine_eval_ready = engine_summary.get("before_cp") is not None and engine_summary.get("after_cp") is not None
+    engine_eval_ready = (
+        engine_summary.get("before_cp") is not None and engine_summary.get("after_cp") is not None
+    )
     if engine_eval_ready:
         eval_before = engine_summary["before_cp"] / 100.0
         eval_after = engine_summary["after_cp"] / 100.0
@@ -103,8 +112,7 @@ def explain_move(fen: str, move_str: str) -> dict:
     capture_destination = chess.square_name(move.to_square)
     opponent_moves_after = list(board_after.legal_moves)
     immediate_recapture_possible = feats["is_capture"] and any(
-        m.to_square == move.to_square and board_after.is_capture(m)
-        for m in opponent_moves_after
+        m.to_square == move.to_square and board_after.is_capture(m) for m in opponent_moves_after
     )
     capturing_piece_loose = feats["is_capture"] and any(
         sq == capture_destination for sq, _ in ud_material_from_mover
@@ -147,6 +155,7 @@ def explain_move(fen: str, move_str: str) -> dict:
     # Add ML prediction if available
     try:
         from ml import predict_move_quality
+
         ml_prediction = predict_move_quality(board, move)
         details["ml_prediction"] = ml_prediction
     except ImportError:
@@ -155,7 +164,12 @@ def explain_move(fen: str, move_str: str) -> dict:
         details["ml_prediction"] = None
 
     # Engine override for non-terminal positions
-    allow_engine_override = key not in {"mate_for", "mate_against", "stalemate", "insufficient_material"}
+    allow_engine_override = key not in {
+        "mate_for",
+        "mate_against",
+        "stalemate",
+        "insufficient_material",
+    }
     if allow_engine_override and engine_summary.get("tone"):
         engine_headline = pick_engine_line(engine_summary["tone"])
         if not engine_headline:
@@ -339,7 +353,9 @@ def _add_move_reasons(
         reasons.add("Slight material loss with this move.")
 
     # King safety
-    king_files_nearby = king_zone_files(board.king(mover_color)) | king_zone_files(board_after.king(mover_color))
+    king_files_nearby = king_zone_files(board.king(mover_color)) | king_zone_files(
+        board_after.king(mover_color)
+    )
     pawn_near_king = (
         moving_piece
         and moving_piece.piece_type == chess.PAWN
@@ -391,9 +407,13 @@ def _add_move_reasons(
     _add_pawn_structure_reasons(reasons, feats, mover_key)
 
     # Undefended moved piece
-    moved_piece_undefended, moved_piece_after = piece_undefended(board_after, move.to_square, mover_color)
+    moved_piece_undefended, moved_piece_after = piece_undefended(
+        board_after, move.to_square, mover_color
+    )
     if moved_piece_undefended and moved_piece_after:
-        reasons.add(f"Your {describe_piece(moved_piece_after)} at {capture_destination} is undefended.")
+        reasons.add(
+            f"Your {describe_piece(moved_piece_after)} at {capture_destination} is undefended."
+        )
 
 
 def _add_castling_reasons(
@@ -416,9 +436,7 @@ def _add_castling_reasons(
 
     is_castling_move = board.is_castling(move)
     king_moved_no_castle = (
-        moving_piece
-        and moving_piece.piece_type == chess.KING
-        and not is_castling_move
+        moving_piece and moving_piece.piece_type == chess.KING and not is_castling_move
     )
     rook_from_k = (
         moving_piece
@@ -445,7 +463,9 @@ def _add_castling_reasons(
         reasons.add("The opponent can no longer castle queenside.")
 
 
-def _add_mobility_reasons(reasons: ReasonBuilder, feats: dict, mover_key: str, opponent_key: str) -> None:
+def _add_mobility_reasons(
+    reasons: ReasonBuilder, feats: dict, mover_key: str, opponent_key: str
+) -> None:
     """Add reasons related to mobility changes."""
     mobility_before = feats["mobility_before"]
     mobility_after = feats["mobility_after"]
@@ -461,7 +481,9 @@ def _add_mobility_reasons(reasons: ReasonBuilder, feats: dict, mover_key: str, o
         reasons.add("The opponent's options are more limited after this move.")
 
 
-def _add_center_control_reasons(reasons: ReasonBuilder, feats: dict, mover_key: str, opponent_key: str) -> None:
+def _add_center_control_reasons(
+    reasons: ReasonBuilder, feats: dict, mover_key: str, opponent_key: str
+) -> None:
     """Add reasons related to center control changes."""
     center_before = feats["center_control_before"]
     center_after = feats["center_control_after"]
@@ -480,7 +502,9 @@ def _add_center_control_reasons(reasons: ReasonBuilder, feats: dict, mover_key: 
         reasons.add("Your opponent's center control declines.")
 
 
-def _add_pin_reasons(reasons: ReasonBuilder, feats: dict, mover_key: str, opponent_key: str) -> None:
+def _add_pin_reasons(
+    reasons: ReasonBuilder, feats: dict, mover_key: str, opponent_key: str
+) -> None:
     """Add reasons related to pin changes."""
     pins_before = feats["pins_before"]
     pins_after = feats["pins_after"]
@@ -519,7 +543,7 @@ def _apply_key_overrides(
     # Trading check
     if feats["is_capture"] or (feats["material_delta"] == 0 and feats["is_capture"]):
         raw_score = feats.get("material_raw_before", 0)
-        mover_is_white = (mover == "White")
+        mover_is_white = mover == "White"
         is_winning = (mover_is_white and raw_score >= 3) or (not mover_is_white and raw_score <= -3)
         is_losing = (mover_is_white and raw_score <= -3) or (not mover_is_white and raw_score >= 3)
 
