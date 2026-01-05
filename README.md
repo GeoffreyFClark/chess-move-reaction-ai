@@ -1,52 +1,144 @@
 # Chess Move Reaction AI
-Chess engines give raw quantitative scores and best lines, but not explanations, reasons, or reactions. This results in unengaging feedback that is often unclear to humans. Many chess players would appreciate AI that feels like a coach or informed spectator: it evaluates a move and reacts with both logic and tone (“Great fork! This move wins material.” or “Prudent choice to move your king to a safer square.” or “Careful. That move hangs a piece.”). Beyond the scope of this project, the concept could be expanded into customized spectator/companion bots, i.e. famous players or commentators. This could result in engaging new learning opportunities with regard to chess.
-The aim of our project is to create an early version of a Chess Move Reaction AI. To do this, we aim to represent a chess board state, receive an input chess move, and to extract features from the chess board state that we can then utilize via algorithms, logic, and heuristics in order to generate a text-based reaction with associated reasons. This project was initially intended to be interfaced with via CLI (command-line-interface), but has been expanded to a GUI (graphical user interface) that is clearer, faster, and more intuitive to use.
 
-## Prereqs
-- Node.js
-- Python 3
-- Recommended to increase reaction precision: Chess Engine (Stockfish 17.1 for Windows x64 included in this repo's backend as `stockfish.exe`. Replace accordingly if using different OS https://stockfishchess.org/download/)
+An AI chess analysis system that provides natural language reactions and explanations for chess moves. Unlike traditional chess engines that only output numerical evaluations, this AI acts like a coach - explaining *why* moves are good, bad, or interesting.
 
-## Run Python venv and install requirements
+![Demo Screenshot](screenshots/sample-screenshot.png)
+
+## Features
+
+- **Natural Language Reactions**: Human-readable reactions and explanations like "Great fork! This move wins material."
+- **Multi-layered Analysis**: Evaluates tactics, material, king safety, pawn structure, mobility, etc
+- **Stockfish Integration**: Optional engine-backed evaluations supporting better move quality evaluation for reaction generation
+- **ML Move Prediction**: Machine learning module for move quality classification
+- **Web Interface**: Interactive drag-and-drop chess board with real-time analysis
+- **REST API**: FastAPI backend for integration with other applications
+- **Cross-Platform**: Supports Windows, macOS, and Linux
+
+## Quick Start
+
+### Using Docker (Automatic Setup, Recommended)
+
+```bash
+git clone https://github.com/GeoffreyFClark/Chess-Move-Reaction-AI
+cd Chess-Move-Reaction-AI
+docker-compose up --build
+# Open http://localhost:3000
+```
+
+### Manual Installation
+
+**Prerequisites:** Python 3.10+, Node.js 18+
+
+```bash
+# Backend
+cd backend
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app:app --reload --port 8000
+
+# Frontend (new terminal)
+cd frontend
+npm install && npm run dev
+# Open http://localhost:5173
+```
+
+### Stockfish Setup (Optional)
+When Stockfish is available, the system uses engine evaluations to provide more accurate move assessments.
+
+To download Stockfish for your platform, the official website is: https://stockfishchess.org/download/
+
+| Platform | Binary Name | Alternate download method |
+|----------|-------------|---------------------------|
+| Windows | `stockfish.exe` | ---------------------- |
+| macOS | `stockfish` | Homebrew: `brew install stockfish` |
+| Linux | `stockfish` | Use your package manager |
+
+Then do ONE of the following:
+- Place the binary in the `backend/` folder (Ensure binary name matches above platform-specific binary name)
+- Add it to your system PATH
+- Set the `STOCKFISH_PATH` environment variable to the full path
+
+**Docker users:** Stockfish 16.1 is automatically downloaded and configured for Docker users during the image build.
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STOCKFISH_PATH` | Auto-detect | Path to Stockfish binary |
+| `STOCKFISH_DEPTH` | `18` | Engine max analysis depth |
+| `STOCKFISH_MOVETIME_MS` | `500` | Max move analysis time |
+
+## Alternative CLI Usage
+
 ```bash
 cd backend
-
-python -m venv .venv
-
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-source .venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-## Run backend 
-```bash
-uvicorn app:app --reload --port 8000
-```
-
-## Run frontend (new terminal)
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Screenshot:
-![sample_screenshot](sample_screenshot.png)
-
-## CLI usage (no server required)
-
-```bash
-# i.e. Starting position and move 1. e4
 python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" --move "e4"
+# Output: Move: e4 | Reaction: Good move. You increase control of the central squares.
 ```
-You can replace the FEN and move with any legal position and move to test different reactions in the CLI.
 
-## Notes
-- v1 uses heuristics, first order logic, and propositional logic based on features extracted via `python-chess`
-- Stockfish is **optional**... When configured, engine before/after evals are attached to the response.
-- API: `POST /api/analyze` with `{ "fen": "...", "move": "Nf3|g1f3" }` returns `{ ok, normalized_move, reaction, details }`.
-- Can be used via CLI or via `react-chessboard` + `chess.js` frontend for drag-and-drop moves.
-- We accept both SAN (i.e. Nf3 -- human preferred) and UCI (fixed coordinate form i.e. g1f3 -- used by python-chess, engines, etc), store/log moves internally as UCI for consistency, and display explanations in SAN for readability.
+## API
+
+**POST /api/analyze**
+
+```json
+// Request
+{"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "move": "e4"}
+
+// Response
+{
+  "ok": true,
+  "normalized_move": "e4",
+  "reaction": "Good move. You increase control of the central squares.",
+  "details": {
+    "turn": "White",
+    "is_capture": false,
+    "is_check_move": false,
+    "is_promotion": false,
+    "material_before": 0,
+    "material_after": 0,
+    "material_delta": 0,
+    "mobility_before": {"white": 20, "black": 20},
+    "mobility_after": {"white": 29, "black": 20},
+    "center_control_before": {"white": 2, "black": 2},
+    "center_control_after": {"white": 4, "black": 2},
+    "castling_rights_lost": {"white_can_castle_k_lost": false, "...": "..."},
+    "pawn_structure_before": {"white": {"doubled": [], "isolated": [], "passed": []}, "...": "..."},
+    "engine": {"enabled": true, "before": {"cp": 20}, "after": {"cp": 35}},
+    "engine_summary": {"before_cp": 20, "after_cp": 35, "tone": "good"},
+    "ml_prediction": {"prediction": "good", "confidence": 0.6, "method": "heuristic"}
+  }
+}
+```
+
+## Project Structure
+
+```
+Chess-Move-Reaction-AI/
+├── backend/
+│   ├── app.py              # FastAPI REST API
+│   ├── explain/            # Move explanation module
+│   ├── features.py         # Chess feature extraction
+│   ├── engine.py           # Stockfish UCI integration
+│   ├── ml/                 # Machine learning module
+│   └── tests/              # Test suite
+├── frontend/
+│   └── src/App.tsx         # React chess board UI
+└── docker-compose.yml
+```
+
+## Development
+
+```bash
+cd backend
+pytest -v                    # Run tests
+ruff check . && black .      # Lint and format
+```
+
+## Docker Images
+
+Images are published to GitHub Container Registry. Version tags:
+
+```bash
+docker pull ghcr.io/yourusername/chess-move-reaction-ai-backend:latest
+docker pull ghcr.io/yourusername/chess-move-reaction-ai-frontend:latest
+```
