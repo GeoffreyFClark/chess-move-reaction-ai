@@ -50,3 +50,10 @@ yarn-error.log*
 data/*.pgn
 data/*.csv
 data/*.sqlite
+
+# --- Stockfish binaries (download separately) ---
+stockfish
+stockfish.exe
+stockfish-*
+*.tar
+*.zip
