@@ -2,6 +2,8 @@
 
 An AI chess analysis system that provides natural language reactions and explanations for chess moves. Unlike traditional chess engines that only output numerical evaluations, this AI acts like a coach - explaining *why* moves are good, bad, or interesting.
 
+The concept can be expanded into customized coach/spectator/companion bots, i.e. famous players or commentators.
+
 ![Demo Screenshot](screenshots/sample-screenshot.png)
 
 ## Features
@@ -139,6 +141,6 @@ ruff check . && black .      # Lint and format
 Images are published to GitHub Container Registry. Version tags:
 
 ```bash
-docker pull ghcr.io/yourusername/chess-move-reaction-ai-backend:latest
-docker pull ghcr.io/yourusername/chess-move-reaction-ai-frontend:latest
+docker pull ghcr.io/GeoffreyFClark/chess-move-reaction-ai-backend:latest
+docker pull ghcr.io/GeoffreyFClark/chess-move-reaction-ai-frontend:latest
 ```
