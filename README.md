@@ -4,30 +4,40 @@ An AI chess analysis system that provides natural language reactions and explana
 
 The concept can be expanded into customized coach/spectator/companion bots, i.e. famous players or commentators.
 
+### How It Works
+1. **Feature Extraction** - Extracts 20+ positional metrics (material, mobility, king safety, pawn structure, pins, etc).
+2. **Engine Evaluation** (optional) - Stockfish centipawn deltas map to quality tones.
+3. **Move Classification** - Heuristics and ML classify moves and generate contextual reasons.
+4. **Reaction Assembly** - A tone-based headline combines with reasons to form the natural language reaction.
+
 ![Demo Screenshot](screenshots/sample-screenshot.png)
 
-## Features
+## Using Docker (Recommended)
 
-- **Natural Language Reactions**: Human-readable reactions and explanations like "Great fork! This move wins material."
-- **Multi-layered Analysis**: Evaluates tactics, material, king safety, pawn structure, mobility, etc
-- **Stockfish Integration**: Optional engine-backed evaluations supporting better move quality evaluation for reaction generation
-- **ML Move Prediction**: Machine learning module for move quality classification
-- **Web Interface**: Interactive drag-and-drop chess board with real-time analysis
-- **REST API**: FastAPI backend for integration with other applications
-- **Cross-Platform**: Supports Windows, macOS, and Linux
-
-## Quick Start
-
-### Using Docker (Automatic Setup, Recommended)
-
+**Option A - Build from source:**
 ```bash
 git clone https://github.com/GeoffreyFClark/Chess-Move-Reaction-AI
 cd Chess-Move-Reaction-AI
-docker-compose up --build
+docker compose up --build
 # Open http://localhost:3000
 ```
 
-### Manual Installation
+**Option B - Prebuilt images:**
+```bash
+git clone https://github.com/GeoffreyFClark/Chess-Move-Reaction-AI
+cd Chess-Move-Reaction-AI
+docker compose -f docker-compose.ghcr.yml up -d
+# Open http://localhost:3000
+```
+
+### Docker Images
+Images are published to GitHub Container Registry:
+```bash
+docker pull ghcr.io/geoffreyfclark/chess-move-reaction-ai-backend:latest
+docker pull ghcr.io/geoffreyfclark/chess-move-reaction-ai-frontend:latest
+```
+
+## Manual Installation
 
 **Prerequisites:** Python 3.10+, Node.js 18+
 
@@ -70,12 +80,37 @@ Then do ONE of the following:
 | `STOCKFISH_DEPTH` | `18` | Engine max analysis depth |
 | `STOCKFISH_MOVETIME_MS` | `500` | Max move analysis time |
 
+## Development
+
+```bash
+cd backend
+pytest -v                    # Run tests
+ruff check . && black .      # Lint and format
+```
+
 ## Alternative CLI Usage
 
 ```bash
 cd backend
 python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" --move "e4"
 # Output: Move: e4 | Reaction: Good move. You increase control of the central squares.
+```
+
+## Project Structure
+
+```
+Chess-Move-Reaction-AI/
+├── backend/
+│   ├── app.py              # FastAPI REST API
+│   ├── explain/            # Move explanation module
+│   ├── features.py         # Chess feature extraction
+│   ├── engine.py           # Stockfish UCI integration
+│   ├── ml/                 # Machine learning module
+│   └── tests/              # Test suite
+├── frontend/
+│   └── src/App.tsx         # React chess board UI
+├── docker-compose.yml      # Build from source
+└── docker-compose.ghcr.yml # Prebuilt images
 ```
 
 ## API
@@ -110,37 +145,4 @@ python cli.py --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" -
     "ml_prediction": {"prediction": "good", "confidence": 0.6, "method": "heuristic"}
   }
 }
-```
-
-## Project Structure
-
-```
-Chess-Move-Reaction-AI/
-├── backend/
-│   ├── app.py              # FastAPI REST API
-│   ├── explain/            # Move explanation module
-│   ├── features.py         # Chess feature extraction
-│   ├── engine.py           # Stockfish UCI integration
-│   ├── ml/                 # Machine learning module
-│   └── tests/              # Test suite
-├── frontend/
-│   └── src/App.tsx         # React chess board UI
-└── docker-compose.yml
-```
-
-## Development
-
-```bash
-cd backend
-pytest -v                    # Run tests
-ruff check . && black .      # Lint and format
-```
-
-## Docker Images
-
-Images are published to GitHub Container Registry. Version tags:
-
-```bash
-docker pull ghcr.io/GeoffreyFClark/chess-move-reaction-ai-backend:latest
-docker pull ghcr.io/GeoffreyFClark/chess-move-reaction-ai-frontend:latest
 ```
